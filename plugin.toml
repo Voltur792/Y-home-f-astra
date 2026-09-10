@@ -1,0 +1,28 @@
+[plugin]
+id = "yandex-smart-home"
+name = "Yandex Smart Home"
+version = "0.1.0"
+description = "Plugin for controlling Yandex Smart Home devices directly from Astra."
+author = "Voltur"
+license = "MIT"
+
+[entry]
+command = "python"
+args = ["-m", "src.plugin"]
+runtimes = ["python"]
+
+[capabilities]
+tools = true
+ui_contributions = true
+
+[permissions]
+# No permissions needed for basic tool/UI functionality
+
+[config]
+# Token is managed inside the plugin's own UI (Умный дом → Настройки) and
+# stored in data/settings.json next to the plugin — no Astra-side config needed.
+schema = "{\"type\":\"object\",\"properties\":{}}"
+
+[platform]
+os = ["windows", "linux"]
+arch = ["x86_64"]

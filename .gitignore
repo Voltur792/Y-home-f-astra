@@ -1,0 +1,14 @@
+# Build artifacts
+*.astraplugin
+
+# Local plugin data: the user's OAuth token. NEVER publish!
+data/
+
+# Author's private notes (not for the public repo)
+публикация.txt
+AGENTS.md
+
+__pycache__/
+*.pyc
+.venv/
+requirements.lock

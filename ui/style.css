@@ -1,0 +1,293 @@
+/* Same approach as the sleep-pause-timer widget:
+   - color-scheme: normal on :root, otherwise the browser paints an opaque
+     canvas under the document (the "opaque background" problem);
+   - html/body transparent so Astra's own page (glass gradient) shines through;
+   - glass cards via color-mix over Astra theme tokens (--color-surface etc.),
+     with hardcoded fallbacks for older daemons. */
+:root {
+    color-scheme: normal;
+    --glass: color-mix(in srgb, var(--color-surface, #808080) 12%, transparent);
+    --glass-soft: color-mix(in srgb, var(--color-surface, #808080) 8%, transparent);
+    --glass-hover: color-mix(in srgb, var(--color-surface, #808080) 24%, transparent);
+    --glass-strong: color-mix(in srgb, var(--color-surface, #808080) 34%, transparent);
+    --stroke: var(--color-border, rgba(255, 255, 255, .09));
+    --stroke-strong: var(--edge-control, rgba(255, 255, 255, .16));
+    --focus-ring: var(--edge-focus, var(--color-accent, #8b5cf6));
+    --text: var(--color-text, #f7f6ff);
+    --text-soft: color-mix(in srgb, var(--color-text, #f7f6ff) 85%, transparent);
+    --muted: var(--color-text-muted, #9a97ad);
+    --accent: var(--color-accent, #8b5cf6);
+    --green: #34c77b;
+    --red: #ff5d5d;
+    --radius-card: 17px;
+    --radius-control: var(--radius-md, 13px);
+}
+body { color-scheme: light dark; }   /* dark controls here, not on the root */
+html, body { background: transparent; }
+
+* { box-sizing: border-box; scrollbar-width: none; }
+*::-webkit-scrollbar { display: none; }
+
+body {
+    margin: 0;
+    padding: 16px 18px;
+    font-family: var(--font-sans, 'Segoe UI', system-ui, sans-serif);
+    color: var(--text);
+    user-select: none;
+    -webkit-user-select: none;
+    font-size: 14px;
+}
+
+.container { max-width: 860px; margin: 0 auto; display: flex; flex-direction: column; min-height: calc(100vh - 32px); }
+
+header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; gap: 10px; }
+.header-left { display: flex; align-items: center; gap: 12px; }
+h1 { margin: 0; font-size: 1.25em; font-weight: 600; letter-spacing: 0.2px; text-shadow: 0 1px 8px rgba(0, 0, 0, .18); }
+h2 { margin: 0 0 14px; font-size: 1.1em; font-weight: 600; }
+h3 { margin: 0 0 10px; font-size: 0.95em; font-weight: 600; }
+
+.status { font-size: 0.78em; padding: 4px 10px; border-radius: 999px; font-weight: 500; white-space: nowrap; }
+.status.connected { color: var(--green); border: 1px solid color-mix(in srgb, var(--green) 35%, transparent); background: color-mix(in srgb, var(--green) 12%, transparent); }
+.status.disconnected { color: var(--red); border: 1px solid color-mix(in srgb, var(--red) 35%, transparent); background: color-mix(in srgb, var(--red) 10%, transparent); }
+.status.loading { color: var(--text-soft); border: 1px solid var(--stroke); background: var(--glass-soft); }
+
+.icon-btn {
+    background: var(--glass);
+    color: var(--text-soft);
+    border: 1px solid var(--stroke);
+    width: 34px; height: 34px;
+    border-radius: 999px;
+    cursor: pointer;
+    font-size: 1.1em;
+    transition: border-color .25s ease, background .25s ease, transform .3s ease;
+    flex-shrink: 0;
+}
+.icon-btn:hover { background: var(--glass-hover); border-color: var(--stroke-strong); }
+.icon-btn.spinning { transform: rotate(360deg); transition: transform 0.5s; }
+
+main { flex: 1; }
+.tab-content { display: none; animation: fadeIn 0.2s ease; }
+.tab-content.active { display: block; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+
+/* ---- Устройства ---- */
+.device-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; }
+.device-card {
+    position: relative;
+    border: 1px solid var(--stroke);
+    border-radius: var(--radius-card);
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    overflow: hidden;
+    background:
+        linear-gradient(145deg, rgba(255, 255, 255, .04), transparent 42%),
+        var(--glass);
+    box-shadow: inset 0 1px rgba(255, 255, 255, .04);
+    transition: border-color .25s ease;
+}
+.device-card:hover { border-color: var(--stroke-strong); }
+/* глоу-блик по верхней грани — как .card::before у панелей Astra */
+.device-card::before {
+    content: "";
+    position: absolute;
+    top: -1px; left: 8%;
+    width: 45%; height: 1px;
+    opacity: .65;
+    background: linear-gradient(90deg, transparent, var(--accent), transparent);
+}
+.device-card.is-on { border-color: color-mix(in srgb, var(--green) 45%, transparent); }
+.device-card.is-on::before { background: linear-gradient(90deg, transparent, var(--green), transparent); }
+.device-name { font-weight: 600; font-size: 0.95em; line-height: 1.3; word-break: break-word; }
+.device-meta { font-size: 0.75em; color: var(--muted); }
+.device-status { font-size: 0.8em; font-weight: 500; }
+.device-status.on { color: var(--green); }
+.device-status.off { color: var(--muted); }
+
+/* Тоггл-переключатель */
+.toggle-row { margin-top: auto; display: flex; align-items: center; gap: 8px; }
+.switch { position: relative; width: 40px; height: 22px; flex-shrink: 0; cursor: pointer; }
+.switch input { opacity: 0; width: 0; height: 0; }
+.slider {
+    position: absolute; inset: 0;
+    background: var(--glass-hover);
+    border: 1px solid var(--stroke);
+    border-radius: 999px;
+    transition: background 0.2s, border-color 0.2s;
+}
+.slider::before {
+    content: "";
+    position: absolute;
+    width: 16px; height: 16px;
+    left: 2px; top: 2px;
+    background: var(--muted);
+    border-radius: 50%;
+    transition: transform 0.2s, background 0.2s;
+}
+.switch input:checked + .slider { background: color-mix(in srgb, var(--green) 55%, transparent); border-color: var(--green); }
+.switch input:checked + .slider::before { transform: translateX(18px); background: #fff; }
+.switch input:disabled + .slider { opacity: 0.5; cursor: wait; }
+.toggle-label { font-size: 0.78em; color: var(--muted); }
+
+/* ---- Сценарии ---- */
+.scenario-list { display: flex; flex-direction: column; gap: 10px; }
+.scenario-card {
+    position: relative;
+    border: 1px solid var(--stroke);
+    border-radius: var(--radius-card);
+    padding: 14px 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    overflow: hidden;
+    background:
+        linear-gradient(145deg, rgba(255, 255, 255, .04), transparent 42%),
+        var(--glass);
+    box-shadow: inset 0 1px rgba(255, 255, 255, .04);
+    transition: border-color .25s ease;
+}
+.scenario-card:hover { border-color: var(--stroke-strong); }
+.scenario-card::before {
+    content: "";
+    position: absolute;
+    top: -1px; left: 8%;
+    width: 45%; height: 1px;
+    opacity: .65;
+    background: linear-gradient(90deg, transparent, var(--accent), transparent);
+}
+.scenario-icon {
+    width: 38px; height: 38px;
+    background: var(--glass-hover);
+    border: 1px solid var(--stroke);
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.2em;
+    flex-shrink: 0;
+}
+.scenario-info { flex: 1; min-width: 0; }
+.scenario-name { font-weight: 600; font-size: 0.95em; }
+.scenario-card .btn { flex-shrink: 0; }
+
+/* ---- Кнопки: стеклянные пилюли, как .btn у панелей Astra ---- */
+.btn {
+    min-width: 36px;
+    padding: 8px 16px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.85em;
+    font-weight: 600;
+    border-radius: 999px;
+    border: 1px solid var(--stroke);
+    background: var(--glass-hover);
+    box-shadow: inset 0 1px rgba(255, 255, 255, .035);
+    color: var(--text-soft);
+    cursor: pointer;
+    transition: border-color .25s ease, background .25s ease, transform .25s ease;
+}
+.btn:hover {
+    transform: translateY(-1px);
+    border-color: var(--stroke-strong);
+    background: var(--glass-strong);
+}
+.btn:disabled { opacity: 0.55; cursor: wait; transform: none; }
+.btn-primary { width: 100%; padding: 11px; font-size: 0.95em; }
+
+/* ---- Настройки ---- */
+.settings-card {
+    position: relative;
+    border: 1px solid var(--stroke);
+    border-radius: var(--radius-card);
+    padding: 20px;
+    overflow: hidden;
+    background:
+        linear-gradient(145deg, rgba(255, 255, 255, .04), transparent 42%),
+        var(--glass);
+    box-shadow: inset 0 1px rgba(255, 255, 255, .04);
+}
+.instructions {
+    background: var(--glass-soft);
+    border: 1px solid var(--stroke);
+    border-radius: 10px;
+    padding: 14px 16px;
+    margin-bottom: 16px;
+    font-size: 0.88em;
+    line-height: 1.55;
+}
+.instructions ol { margin: 8px 0 0; padding-left: 20px; }
+.instructions li { margin-bottom: 8px; }
+.instructions code {
+    background: rgba(0, 0, 0, .22);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.92em;
+    word-break: break-all;
+}
+.form-group { margin-bottom: 14px; }
+.form-group label { display: block; margin-bottom: 6px; font-size: 0.85em; color: var(--muted); font-weight: 500; }
+.form-group input {
+    width: 100%;
+    padding: 10px 12px;
+    background: rgba(0, 0, 0, .22);
+    border: 1px solid var(--stroke);
+    color: var(--text);
+    border-radius: var(--radius-control);
+    font-size: 0.92em;
+    outline: none;
+    transition: border-color 0.15s;
+}
+.form-group input:focus { border-color: var(--focus-ring); }
+
+.message { margin-top: 12px; font-size: 0.85em; min-height: 1.2em; }
+.message.success { color: var(--green); }
+.message.error { color: var(--red); }
+
+/* ---- Состояния ---- */
+.placeholder { text-align: center; padding: 40px 20px; color: var(--muted); grid-column: 1 / -1; }
+.placeholder .big { font-size: 2em; margin-bottom: 10px; }
+.placeholder.error { color: var(--red); }
+.spinner {
+    display: inline-block;
+    width: 22px; height: 22px;
+    border: 3px solid var(--stroke);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin-bottom: 10px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ---- Вкладки: сегментированный стеклянный переключатель ---- */
+.tabs {
+    display: flex;
+    gap: 6px;
+    margin-top: 16px;
+    border: 1px solid var(--stroke);
+    border-radius: 999px;
+    padding: 5px;
+    background: var(--glass-soft);
+    box-shadow: inset 0 1px rgba(255, 255, 255, .03);
+}
+.tab-btn {
+    flex: 1;
+    background: transparent;
+    color: var(--muted);
+    border: 1px solid transparent;
+    padding: 9px 10px;
+    cursor: pointer;
+    border-radius: 999px;
+    font-size: 0.88em;
+    font-weight: 500;
+    transition: background .25s ease, color .25s ease, border-color .25s ease;
+}
+.tab-btn:hover { color: var(--text); background: var(--glass-hover); }
+/* Активная вкладка — акцентная рамка + лёгкая заливка, текст всегда --text */
+.tab-btn.active {
+    color: var(--text);
+    background: color-mix(in srgb, var(--accent) 22%, transparent);
+    border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+}
+
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }

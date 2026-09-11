@@ -68,3 +68,9 @@ astra-plugin build
 ## Лицензия
 
 MIT · Автор: Voltur (GitHub [Voltur792](https://github.com/Voltur792))
+
+## Поддержать автора
+
+Если плагин оказался полезным, можно поддержать разработку:
+
+**[boosty.to/voltur/donate](https://boosty.to/voltur/donate)**

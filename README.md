@@ -67,7 +67,7 @@ astra-plugin build
 
 ## Лицензия
 
-MIT · Автор: Voltur (GitHub [Voltur792](https://github.com/Voltur792))
+[MIT](LICENSE) · Автор: Voltur (GitHub [Voltur792](https://github.com/Voltur792))
 
 ## Поддержать автора
 

@@ -1,59 +1,64 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-    <!-- Мост Astra — грузится ПЕРВЫМ, до любых стилей -->
     <script src="http://astra-plugin.localhost/bridge/astra-bridge.js"></script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Yandex Smart Home</title>
+    <title>Умный дом</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div class="container">
         <header>
             <div class="header-left">
-                <h1>🏠 Умный дом</h1>
-                <div id="status" class="status disconnected">Нет подключения</div>
+                <div class="eyebrow">ЯНДЕКС · УПРАВЛЕНИЕ ДОМОМ</div>
+                <h1>Умный дом<span class="title-dot" aria-hidden="true">.</span></h1>
+                <div id="status" class="status loading" role="status">Подключаемся…</div>
             </div>
-            <button id="refresh-btn" class="icon-btn" title="Обновить">⟳</button>
+            <button id="refresh-btn" class="icon-btn" title="Обновить данные" aria-label="Обновить данные">↻</button>
         </header>
+        <nav class="tabs" role="tablist" aria-label="Умный дом">
+            <button id="tab-devices" class="tab-btn active" role="tab" aria-selected="true" aria-controls="devices" data-tab="devices">Устройства <span id="devices-count" class="count">—</span></button>
+            <button id="tab-scenarios" class="tab-btn" role="tab" aria-selected="false" aria-controls="scenarios" tabindex="-1" data-tab="scenarios">Сценарии <span id="scenarios-count" class="count">—</span></button>
+            <button id="tab-settings" class="tab-btn" role="tab" aria-selected="false" aria-controls="settings" tabindex="-1" data-tab="settings">Настройки</button>
+        </nav>
+        <div id="notice" class="notice" role="status" aria-live="polite" hidden></div>
         <main>
-            <!-- Устройства -->
-            <section id="devices" class="tab-content active">
+            <section id="devices" class="tab-content active" role="tabpanel" aria-labelledby="tab-devices">
+                <div class="section-heading"><h2>Ваши устройства</h2><span id="devices-updated" class="updated"></span></div>
                 <div id="device-list" class="device-grid"></div>
             </section>
-            <!-- Сценарии -->
-            <section id="scenarios" class="tab-content">
+            <section id="scenarios" class="tab-content" role="tabpanel" aria-labelledby="tab-scenarios">
+                <div class="section-heading"><h2>Одно нажатие — готово</h2><span id="scenarios-updated" class="updated"></span></div>
+                <p class="section-description">Сценарии из вашего аккаунта «Дом с Алисой».</p>
                 <div id="scenario-list" class="scenario-list"></div>
             </section>
-            <!-- Настройки -->
-            <section id="settings" class="tab-content">
+            <section id="settings" class="tab-content" role="tabpanel" aria-labelledby="tab-settings">
                 <div class="settings-card">
-                    <h2>Подключение к Яндексу</h2>
-                    <div class="instructions">
-                        <h3>Как получить OAuth-токен:</h3>
-                        <ol>
-                            <li>Откройте <a href="https://oauth.yandex.ru/?dialog=create-client-entry" target="_blank">создание приложения</a> и выберите тип <b>«Для доступа к API или отладки»</b>.</li>
-                            <li>В разделе «Доступы» найдите <b>Умный дом Яндекса</b> и добавьте права <code>iot:view</code> и <code>iot:control</code>.</li>
-                            <li>Нажмите «Создать приложение» и скопируйте его <b>ClientID</b>.</li>
-                            <li>Откройте ссылку, подставив свой ClientID:<br><code>https://oauth.yandex.ru/authorize?response_type=token&amp;client_id=ВАШ_CLIENTID</code></li>
-                            <li>После авторизации Яндекс покажет токен — скопируйте его (начинается с <code>y0__</code>) и вставьте ниже.</li>
-                        </ol>
-                    </div>
+                    <div class="eyebrow">ПОДКЛЮЧЕНИЕ</div>
+                    <h2>Ваш аккаунт Яндекса</h2>
+                    <p class="section-description">OAuth-токен даёт плагину доступ к устройствам и сценариям вашего дома.</p>
                     <div class="form-group">
                         <label for="token">OAuth-токен</label>
-                        <input type="password" id="token" placeholder="y0__..." autocomplete="off">
+                        <input type="password" id="token" placeholder="Вставьте токен y0__…" autocomplete="off" spellcheck="false" aria-describedby="token-help">
+                        <p id="token-help" class="input-help">Для смены аккаунта введите новый токен.</p>
                     </div>
-                    <button id="save-settings" class="btn btn-primary">Подключить</button>
-                    <div id="settings-message" class="message"></div>
+                    <button id="save-settings" class="btn btn-primary">Проверить и подключить</button>
+                    <div id="settings-message" class="message" role="status" aria-live="polite"></div>
+                    <details class="instructions">
+                        <summary>Как получить OAuth-токен</summary>
+                        <ol>
+                            <li>Откройте <a href="https://oauth.yandex.ru/?dialog=create-client-entry" target="_blank" rel="noopener noreferrer">создание приложения</a> и выберите тип <b>«Для доступа к API или отладки»</b>.</li>
+                            <li>В разделе «Доступы» найдите <b>Умный дом Яндекса</b> и добавьте права <code>iot:view</code> и <code>iot:control</code>.</li>
+                            <li>Создайте приложение и скопируйте <b>ClientID</b>.</li>
+                            <li>Откройте ссылку, подставив свой ClientID:<br><code class="token-url">https://oauth.yandex.ru/authorize?response_type=token&amp;client_id=ВАШ_CLIENTID</code></li>
+                            <li>Авторизуйтесь, скопируйте токен и вставьте его в поле выше.</li>
+                        </ol>
+                    </details>
                 </div>
             </section>
         </main>
-        <nav class="tabs">
-            <button class="tab-btn active" data-tab="devices">💡 Устройства</button>
-            <button class="tab-btn" data-tab="scenarios">⚡ Сценарии</button>
-            <button class="tab-btn" data-tab="settings">⚙️ Настройки</button>
-        </nav>
+        <footer>Дом с Алисой <span>Автообновление каждые 10 секунд</span></footer>
     </div>
     <script src="script.js"></script>
 </body>

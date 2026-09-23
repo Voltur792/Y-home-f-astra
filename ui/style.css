@@ -1,293 +1,121 @@
-/* Same approach as the sleep-pause-timer widget:
-   - color-scheme: normal on :root, otherwise the browser paints an opaque
-     canvas under the document (the "opaque background" problem);
-   - html/body transparent so Astra's own page (glass gradient) shines through;
-   - glass cards via color-mix over Astra theme tokens (--color-surface etc.),
-     with hardcoded fallbacks for older daemons. */
+/* Keep the iframe canvas transparent; Astra supplies the background and glass. */
 :root {
     color-scheme: normal;
     --glass: color-mix(in srgb, var(--color-surface, #808080) 12%, transparent);
     --glass-soft: color-mix(in srgb, var(--color-surface, #808080) 8%, transparent);
     --glass-hover: color-mix(in srgb, var(--color-surface, #808080) 24%, transparent);
-    --glass-strong: color-mix(in srgb, var(--color-surface, #808080) 34%, transparent);
-    --stroke: var(--color-border, rgba(255, 255, 255, .09));
-    --stroke-strong: var(--edge-control, rgba(255, 255, 255, .16));
-    --focus-ring: var(--edge-focus, var(--color-accent, #8b5cf6));
+    --stroke: var(--color-border, rgba(255,255,255,.16));
+    --stroke-strong: var(--edge-control, rgba(255,255,255,.32));
+    --focus: var(--edge-focus, var(--color-accent, #c6c1ff));
     --text: var(--color-text, #f7f6ff);
-    --text-soft: color-mix(in srgb, var(--color-text, #f7f6ff) 85%, transparent);
-    --muted: var(--color-text-muted, #9a97ad);
-    --accent: var(--color-accent, #8b5cf6);
-    --green: #34c77b;
-    --red: #ff5d5d;
-    --radius-card: 17px;
-    --radius-control: var(--radius-md, 13px);
+    --muted: var(--color-text-muted, #b5b2cb);
+    --accent: var(--color-accent, #c6c1ff);
+    --green: #60dbab;
+    --red: #ff929e;
 }
-body { color-scheme: light dark; }   /* dark controls here, not on the root */
+* { box-sizing: border-box; }
 html, body { background: transparent; }
-
-* { box-sizing: border-box; scrollbar-width: none; }
-*::-webkit-scrollbar { display: none; }
-
-body {
-    margin: 0;
-    padding: 16px 18px;
-    font-family: var(--font-sans, 'Segoe UI', system-ui, sans-serif);
-    color: var(--text);
-    user-select: none;
-    -webkit-user-select: none;
-    font-size: 14px;
-}
-
-.container { max-width: 860px; margin: 0 auto; display: flex; flex-direction: column; min-height: calc(100vh - 32px); }
-
-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; gap: 10px; }
-.header-left { display: flex; align-items: center; gap: 12px; }
-h1 { margin: 0; font-size: 1.25em; font-weight: 600; letter-spacing: 0.2px; text-shadow: 0 1px 8px rgba(0, 0, 0, .18); }
-h2 { margin: 0 0 14px; font-size: 1.1em; font-weight: 600; }
-h3 { margin: 0 0 10px; font-size: 0.95em; font-weight: 600; }
-
-.status { font-size: 0.78em; padding: 4px 10px; border-radius: 999px; font-weight: 500; white-space: nowrap; }
-.status.connected { color: var(--green); border: 1px solid color-mix(in srgb, var(--green) 35%, transparent); background: color-mix(in srgb, var(--green) 12%, transparent); }
-.status.disconnected { color: var(--red); border: 1px solid color-mix(in srgb, var(--red) 35%, transparent); background: color-mix(in srgb, var(--red) 10%, transparent); }
-.status.loading { color: var(--text-soft); border: 1px solid var(--stroke); background: var(--glass-soft); }
-
-.icon-btn {
-    background: var(--glass);
-    color: var(--text-soft);
-    border: 1px solid var(--stroke);
-    width: 34px; height: 34px;
-    border-radius: 999px;
-    cursor: pointer;
-    font-size: 1.1em;
-    transition: border-color .25s ease, background .25s ease, transform .3s ease;
-    flex-shrink: 0;
-}
-.icon-btn:hover { background: var(--glass-hover); border-color: var(--stroke-strong); }
-.icon-btn.spinning { transform: rotate(360deg); transition: transform 0.5s; }
-
+body { color-scheme: light dark; margin: 0; padding: 26px 24px 18px; color: var(--text); font: 14px/1.5 var(--font-sans, 'Segoe UI', sans-serif); }
+button, input { font: inherit; }
+button { color: var(--text); cursor: pointer; }
+button, a, summary, input { -webkit-tap-highlight-color: transparent; }
+button:focus-visible, a:focus-visible, summary:focus-visible, input:focus-visible { outline: 2px solid var(--focus); outline-offset: 4px; }
+button:disabled { opacity: .55; cursor: wait; }
+[hidden] { display: none !important; }
+.container { max-width: 1040px; min-height: calc(100vh - 44px); margin: auto; display: flex; flex-direction: column; }
+header { display: flex; align-items: center; justify-content: space-between; gap: 18px; margin-bottom: 24px; }
+.eyebrow { color: var(--muted); font-size: 10px; font-weight: 650; letter-spacing: .13em; margin-bottom: 6px; }
+h1 { font-size: clamp(26px, 4vw, 34px); font-weight: 650; line-height: 1.2; letter-spacing: -.035em; margin: 0 0 10px; }
+.title-dot { color: var(--accent); }
+h2 { font-size: 16px; font-weight: 600; margin: 0; letter-spacing: -.015em; }
+h3 { margin: 0; }
+.status { display: flex; align-items: center; gap: 7px; color: var(--muted); font-size: 12px; }
+.status::before { content: ''; width: 6px; height: 6px; background: currentColor; border-radius: 50%; }
+.status.connected::before { color: var(--green); box-shadow: 0 0 0 3px color-mix(in srgb, var(--green) 12%, transparent); }
+.status.disconnected::before { color: var(--red); }
+.icon-btn { border: 1px solid var(--stroke); background: var(--glass); border-radius: 12px; width: 42px; height: 42px; font-size: 25px; line-height: 1; }
+.icon-btn:hover { background: var(--glass-hover); }
+.icon-btn.spinning { opacity: .5; }
+.tabs { display: flex; gap: 5px; border-bottom: 1px solid var(--stroke); padding: 0 0 8px; margin-bottom: 22px; }
+.tab-btn { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 9px 14px; background: transparent; border: 1px solid transparent; border-radius: 9px; color: var(--muted); font-size: 13px; font-weight: 550; }
+.tab-btn:hover { color: var(--text); background: var(--glass); }
+.tab-btn.active { color: var(--text); background: color-mix(in srgb, var(--accent) 14%, transparent); border-color: color-mix(in srgb, var(--accent) 30%, transparent); }
+.count { min-width: 20px; text-align: center; font-size: 11px; font-variant-numeric: tabular-nums; opacity: .8; }
 main { flex: 1; }
-.tab-content { display: none; animation: fadeIn 0.2s ease; }
-.tab-content.active { display: block; }
-@keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
-
-/* ---- Устройства ---- */
-.device-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; }
-.device-card {
-    position: relative;
-    border: 1px solid var(--stroke);
-    border-radius: var(--radius-card);
-    padding: 14px;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    overflow: hidden;
-    background:
-        linear-gradient(145deg, rgba(255, 255, 255, .04), transparent 42%),
-        var(--glass);
-    box-shadow: inset 0 1px rgba(255, 255, 255, .04);
-    transition: border-color .25s ease;
-}
+.tab-content { display: none; }
+.tab-content.active { display: block; animation: appear .18s ease; }
+@keyframes appear { from { opacity: .6; transform: translateY(3px); } to { opacity: 1; transform: none; } }
+.section-heading { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 16px; }
+.updated { font-size: 11px; color: var(--muted); text-align: right; }
+.section-description { color: var(--muted); font-size: 13px; margin: -7px 0 20px; }
+.device-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(215px, 1fr)); gap: 12px; }
+.device-card { display: flex; flex-direction: column; padding: 17px; min-height: 150px; border: 1px solid var(--stroke); border-radius: 14px; background: var(--glass); transition: border-color .18s; }
 .device-card:hover { border-color: var(--stroke-strong); }
-/* глоу-блик по верхней грани — как .card::before у панелей Astra */
-.device-card::before {
-    content: "";
-    position: absolute;
-    top: -1px; left: 8%;
-    width: 45%; height: 1px;
-    opacity: .65;
-    background: linear-gradient(90deg, transparent, var(--accent), transparent);
-}
-.device-card.is-on { border-color: color-mix(in srgb, var(--green) 45%, transparent); }
-.device-card.is-on::before { background: linear-gradient(90deg, transparent, var(--green), transparent); }
-.device-name { font-weight: 600; font-size: 0.95em; line-height: 1.3; word-break: break-word; }
-.device-meta { font-size: 0.75em; color: var(--muted); }
-.device-status { font-size: 0.8em; font-weight: 500; }
-.device-status.on { color: var(--green); }
-.device-status.off { color: var(--muted); }
-
-/* Тоггл-переключатель */
-.toggle-row { margin-top: auto; display: flex; align-items: center; gap: 8px; }
-.switch { position: relative; width: 40px; height: 22px; flex-shrink: 0; cursor: pointer; }
-.switch input { opacity: 0; width: 0; height: 0; }
-.slider {
-    position: absolute; inset: 0;
-    background: var(--glass-hover);
-    border: 1px solid var(--stroke);
-    border-radius: 999px;
-    transition: background 0.2s, border-color 0.2s;
-}
-.slider::before {
-    content: "";
-    position: absolute;
-    width: 16px; height: 16px;
-    left: 2px; top: 2px;
-    background: var(--muted);
-    border-radius: 50%;
-    transition: transform 0.2s, background 0.2s;
-}
-.switch input:checked + .slider { background: color-mix(in srgb, var(--green) 55%, transparent); border-color: var(--green); }
-.switch input:checked + .slider::before { transform: translateX(18px); background: #fff; }
-.switch input:disabled + .slider { opacity: 0.5; cursor: wait; }
-.toggle-label { font-size: 0.78em; color: var(--muted); }
-
-/* ---- Сценарии ---- */
-.scenario-list { display: flex; flex-direction: column; gap: 10px; }
-.scenario-card {
-    position: relative;
-    border: 1px solid var(--stroke);
-    border-radius: var(--radius-card);
-    padding: 14px 16px;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    overflow: hidden;
-    background:
-        linear-gradient(145deg, rgba(255, 255, 255, .04), transparent 42%),
-        var(--glass);
-    box-shadow: inset 0 1px rgba(255, 255, 255, .04);
-    transition: border-color .25s ease;
-}
-.scenario-card:hover { border-color: var(--stroke-strong); }
-.scenario-card::before {
-    content: "";
-    position: absolute;
-    top: -1px; left: 8%;
-    width: 45%; height: 1px;
-    opacity: .65;
-    background: linear-gradient(90deg, transparent, var(--accent), transparent);
-}
-.scenario-icon {
-    width: 38px; height: 38px;
-    background: var(--glass-hover);
-    border: 1px solid var(--stroke);
-    border-radius: 10px;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 1.2em;
-    flex-shrink: 0;
-}
+.device-card.is-on { border-color: color-mix(in srgb, var(--green) 38%, var(--stroke)); background: linear-gradient(130deg, color-mix(in srgb, var(--green) 5%, transparent), transparent 80%), var(--glass); }
+.device-meta { color: var(--muted); font-size: 11px; margin-bottom: 8px; overflow-wrap: anywhere; }
+.device-name { font-size: 15px; font-weight: 600; line-height: 1.4; overflow-wrap: anywhere; margin-bottom: 24px; }
+.device-controls { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: auto; }
+.device-status { color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
+.device-status.on { color: var(--text); }
+.switch { position: relative; width: 42px; height: 24px; flex-shrink: 0; display: block; cursor: pointer; }
+.switch input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
+.slider { position: absolute; inset: 0; pointer-events: none; border: 1px solid var(--stroke-strong); background: var(--glass-hover); border-radius: 24px; transition: background .18s; }
+.slider::before { content: ''; position: absolute; width: 16px; height: 16px; left: 3px; top: 3px; background: var(--muted); border-radius: 50%; transition: transform .18s; }
+.switch input:checked + .slider { background: color-mix(in srgb, var(--green) 30%, transparent); border-color: color-mix(in srgb, var(--green) 65%, transparent); }
+.switch input:checked + .slider::before { background: var(--text); transform: translateX(18px); }
+.switch input:focus-visible + .slider { outline: 2px solid var(--focus); outline-offset: 4px; }
+.switch input:disabled + .slider { opacity: .5; }
+.scenario-list { display: flex; flex-direction: column; gap: 9px; }
+.scenario-card { display: flex; align-items: center; gap: 14px; padding: 15px 18px; border: 1px solid var(--stroke); border-radius: 12px; background: var(--glass); }
+.scenario-icon { display: grid; place-items: center; width: 36px; height: 36px; flex: 0 0 36px; color: var(--text); background: var(--glass-hover); border-radius: 10px; font-size: 23px; }
 .scenario-info { flex: 1; min-width: 0; }
-.scenario-name { font-weight: 600; font-size: 0.95em; }
-.scenario-card .btn { flex-shrink: 0; }
-
-/* ---- Кнопки: стеклянные пилюли, как .btn у панелей Astra ---- */
-.btn {
-    min-width: 36px;
-    padding: 8px 16px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 0.85em;
-    font-weight: 600;
-    border-radius: 999px;
-    border: 1px solid var(--stroke);
-    background: var(--glass-hover);
-    box-shadow: inset 0 1px rgba(255, 255, 255, .035);
-    color: var(--text-soft);
-    cursor: pointer;
-    transition: border-color .25s ease, background .25s ease, transform .25s ease;
-}
-.btn:hover {
-    transform: translateY(-1px);
-    border-color: var(--stroke-strong);
-    background: var(--glass-strong);
-}
-.btn:disabled { opacity: 0.55; cursor: wait; transform: none; }
-.btn-primary { width: 100%; padding: 11px; font-size: 0.95em; }
-
-/* ---- Настройки ---- */
-.settings-card {
-    position: relative;
-    border: 1px solid var(--stroke);
-    border-radius: var(--radius-card);
-    padding: 20px;
-    overflow: hidden;
-    background:
-        linear-gradient(145deg, rgba(255, 255, 255, .04), transparent 42%),
-        var(--glass);
-    box-shadow: inset 0 1px rgba(255, 255, 255, .04);
-}
-.instructions {
-    background: var(--glass-soft);
-    border: 1px solid var(--stroke);
-    border-radius: 10px;
-    padding: 14px 16px;
-    margin-bottom: 16px;
-    font-size: 0.88em;
-    line-height: 1.55;
-}
-.instructions ol { margin: 8px 0 0; padding-left: 20px; }
-.instructions li { margin-bottom: 8px; }
-.instructions code {
-    background: rgba(0, 0, 0, .22);
-    padding: 2px 6px;
-    border-radius: 4px;
-    font-size: 0.92em;
-    word-break: break-all;
-}
-.form-group { margin-bottom: 14px; }
-.form-group label { display: block; margin-bottom: 6px; font-size: 0.85em; color: var(--muted); font-weight: 500; }
-.form-group input {
-    width: 100%;
-    padding: 10px 12px;
-    background: rgba(0, 0, 0, .22);
-    border: 1px solid var(--stroke);
-    color: var(--text);
-    border-radius: var(--radius-control);
-    font-size: 0.92em;
-    outline: none;
-    transition: border-color 0.15s;
-}
-.form-group input:focus { border-color: var(--focus-ring); }
-
-.message { margin-top: 12px; font-size: 0.85em; min-height: 1.2em; }
-.message.success { color: var(--green); }
+.scenario-name { font-size: 14px; font-weight: 600; overflow-wrap: anywhere; }
+.scenario-result { color: var(--muted); font-size: 11px; }
+.btn { flex-shrink: 0; border: 1px solid var(--stroke-strong); background: var(--glass); color: var(--text); padding: 9px 14px; border-radius: 9px; font-size: 12px; font-weight: 600; transition: background .18s; }
+.btn:hover { background: var(--glass-hover); }
+.btn-primary { background: color-mix(in srgb, var(--accent) 16%, transparent); border-color: color-mix(in srgb, var(--accent) 40%, transparent); font-size: 13px; min-height: 42px; }
+.settings-card { max-width: 680px; background: var(--glass); border: 1px solid var(--stroke); padding: 24px; border-radius: 14px; }
+.settings-card h2 { font-size: 21px; margin-bottom: 14px; }
+.settings-card .section-description { margin: 0 0 24px; }
+.form-group label { display: block; margin-bottom: 8px; font-size: 12px; font-weight: 600; }
+.form-group input { width: 100%; background: var(--glass-soft); border: 1px solid var(--stroke-strong); border-radius: 9px; padding: 12px; color: var(--text); }
+.form-group input::placeholder { color: var(--muted); }
+.input-help { font-size: 11px; color: var(--muted); margin: 7px 0 18px; }
+.instructions { border-top: 1px solid var(--stroke); padding-top: 18px; margin-top: 20px; font-size: 12px; color: var(--muted); }
+.instructions summary { cursor: pointer; color: var(--text); font-weight: 550; }
+.instructions ol { padding-left: 18px; margin: 16px 0 0; }
+.instructions li { padding-left: 4px; margin: 0 0 12px; }
+code { color: var(--text); font-size: 11px; overflow-wrap: anywhere; }
+a { color: var(--text); text-decoration: underline; text-underline-offset: 3px; }
+a:hover { color: var(--accent); }
+.message { margin-top: 12px; font-size: 12px; }
+.message:empty { display: none; }
 .message.error { color: var(--red); }
-
-/* ---- Состояния ---- */
-.placeholder { text-align: center; padding: 40px 20px; color: var(--muted); grid-column: 1 / -1; }
-.placeholder .big { font-size: 2em; margin-bottom: 10px; }
-.placeholder.error { color: var(--red); }
-.spinner {
-    display: inline-block;
-    width: 22px; height: 22px;
-    border: 3px solid var(--stroke);
-    border-top-color: var(--accent);
-    border-radius: 50%;
-    animation: spin 0.8s linear infinite;
-    margin-bottom: 10px;
-}
+.message.success { color: var(--text); }
+.notice { border: 1px solid var(--stroke); border-left: 3px solid var(--green); background: var(--glass); padding: 11px 14px; border-radius: 8px; margin: -4px 0 20px; font-size: 12px; overflow-wrap: anywhere; }
+.notice.error { border-left-color: var(--red); }
+.placeholder { grid-column: 1 / -1; padding: 54px 20px; text-align: center; border: 1px dashed var(--stroke-strong); border-radius: 14px; color: var(--muted); }
+.placeholder strong { font-weight: 600; font-size: 16px; color: var(--text); }
+.placeholder p { margin: 8px auto 0; max-width: 380px; font-size: 13px; }
+.placeholder.error strong { color: var(--red); }
+.spinner { display: inline-block; width: 22px; height: 22px; border: 2px solid var(--stroke); border-top-color: var(--accent); border-radius: 50%; animation: spin .8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
-
-/* ---- Вкладки: сегментированный стеклянный переключатель ---- */
-.tabs {
-    display: flex;
-    gap: 6px;
-    margin-top: 16px;
-    border: 1px solid var(--stroke);
-    border-radius: 999px;
-    padding: 5px;
-    background: var(--glass-soft);
-    box-shadow: inset 0 1px rgba(255, 255, 255, .03);
+[data-stale] { opacity: .65; }
+footer { display: flex; justify-content: space-between; gap: 12px; color: var(--muted); font-size: 10px; margin-top: 32px; padding-top: 14px; border-top: 1px solid var(--stroke); }
+@media (max-width: 520px) {
+    body { padding: 20px 14px 14px; }
+    .tabs { gap: 2px; }
+    .tab-btn { flex: 1; padding: 9px 6px; font-size: 12px; gap: 4px; }
+    .count { min-width: 13px; }
+    .device-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
+    .device-card { padding: 13px; }
+    .device-name { font-size: 14px; }
+    .section-heading { align-items: start; }
+    .updated { max-width: 115px; }
+    .scenario-card { padding: 13px; gap: 10px; }
+    .scenario-icon { display: none; }
+    .settings-card { padding: 18px; }
+    footer { font-size: 9px; }
 }
-.tab-btn {
-    flex: 1;
-    background: transparent;
-    color: var(--muted);
-    border: 1px solid transparent;
-    padding: 9px 10px;
-    cursor: pointer;
-    border-radius: 999px;
-    font-size: 0.88em;
-    font-weight: 500;
-    transition: background .25s ease, color .25s ease, border-color .25s ease;
-}
-.tab-btn:hover { color: var(--text); background: var(--glass-hover); }
-/* Активная вкладка — акцентная рамка + лёгкая заливка, текст всегда --text */
-.tab-btn.active {
-    color: var(--text);
-    background: color-mix(in srgb, var(--accent) 22%, transparent);
-    border-color: color-mix(in srgb, var(--accent) 55%, transparent);
-}
-
-a { color: var(--accent); text-decoration: none; }
-a:hover { text-decoration: underline; }
+@media (max-width: 340px) { .device-grid { grid-template-columns: 1fr; } .count { display: none; } }
+@media (prefers-reduced-motion: reduce) { *, *::before { animation: none !important; transition: none !important; } }

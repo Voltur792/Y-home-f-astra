@@ -19,6 +19,13 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from astra_plugin_sdk.testing import Harness, fuzz_configs  # noqa: E402
 
 from src.plugin import YandexSmartHome  # noqa: E402
+import pytest
+
+
+@pytest.fixture(autouse=True)
+def isolated_settings(monkeypatch, tmp_path):
+    monkeypatch.setattr("src.plugin.DATA_DIR", tmp_path)
+    monkeypatch.setattr("src.plugin.SETTINGS_FILE", tmp_path / "settings.json")
 
 def test_the_plugin_starts_and_answers_a_health_check():
     with Harness(YandexSmartHome()) as h:

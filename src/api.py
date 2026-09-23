@@ -1,5 +1,6 @@
 import requests
 import logging
+from urllib.parse import quote
 from typing import List, Dict, Any, Optional
 
 logger = logging.getLogger(__name__)
@@ -38,7 +39,7 @@ class YandexSmartHomeAPI:
         try:
             response = self.session.get(url, params=params, timeout=10)
             response.raise_for_status()
-            return response.json()
+            return self._validate_response(response.json())
         except requests.exceptions.RequestException as e:
             response = getattr(e, "response", None)
             if response is not None:
@@ -51,13 +52,22 @@ class YandexSmartHomeAPI:
         try:
             response = self.session.post(url, json=data, timeout=10)
             response.raise_for_status()
-            return response.json()
+            return self._validate_response(response.json())
         except requests.exceptions.RequestException as e:
             response = getattr(e, "response", None)
             if response is not None:
                 raise RuntimeError(self._extract_error(response)) from e
             logger.error(f"Request to {url} failed: {e}")
             raise
+
+    @staticmethod
+    def _validate_response(body: Any) -> Dict[str, Any]:
+        if not isinstance(body, dict):
+            raise RuntimeError("Яндекс вернул некорректный ответ")
+        if body.get("error_code") or str(body.get("status", "")).lower() == "error":
+            raise RuntimeError(str(body.get("error_code") or body.get("status")) + ": " +
+                               str(body.get("error_message") or body.get("message") or "Ошибка Яндекса"))
+        return body
 
     def get_user_info(self) -> Dict[str, Any]:
         """Get full smart home info: devices, groups, scenarios in one request."""
@@ -94,14 +104,18 @@ class YandexSmartHomeAPI:
         endpoint = "/v1.0/devices/actions"
         result = self._post(endpoint, data)
         
-        # Check per-device/per-capability errors in the response
-        for dev in result.get("devices", []) if isinstance(result, dict) else []:
-            for cap in dev.get("action_result", {}).get("capabilities", []) if isinstance(dev, dict) else []:
-                state = cap.get("state", {}) if isinstance(cap, dict) else {}
-                code = state.get("error_code")
-                if code and code != "INVALID_ACTION":
-                    raise RuntimeError(f"{code}: {state.get('error_message', '')}")
-        return True
+        self._validate_response(result)
+        for dev in result.get("devices", []):
+            if dev.get("id") != device_id:
+                continue
+            self._validate_response(dev.get("action_result") or {})
+            for cap in dev.get("capabilities", []):
+                state = cap.get("state") or {}
+                if cap.get("type") == capability_type and state.get("instance") == capability_instance:
+                    action = self._validate_response(state.get("action_result") or {})
+                    if action.get("status") == "DONE":
+                        return True
+        raise RuntimeError("Яндекс не подтвердил выполнение команды устройством")
 
     def get_scenarios(self) -> List[Dict[str, Any]]:
         """Get list of all scenarios."""
@@ -110,6 +124,10 @@ class YandexSmartHomeAPI:
 
     def run_scenario(self, scenario_id: str) -> bool:
         """Run a scenario."""
-        endpoint = f"/v1.0/scenarios/{scenario_id}/actions"
-        self._post(endpoint)
+        if not isinstance(scenario_id, str) or not scenario_id.strip():
+            raise ValueError("Не указан сценарий")
+        endpoint = f"/v1.0/scenarios/{quote(scenario_id, safe='')}/actions"
+        result = self._validate_response(self._post(endpoint))
+        if result.get("status") != "ok":
+            raise RuntimeError("Яндекс не подтвердил запуск сценария")
         return True

@@ -1,12 +1,13 @@
 [project]
 name = "yandex_smart_home"
-version = "0.1.0"
+version = "0.1.1"
 description = "An Astra plugin"
 requires-python = ">=3.10"
 dependencies = [
     "astra-plugin-sdk>=0.6,<0.7",
     "grpcio>=1.60.0",
     "protobuf>=4.25.0",
+    "requests>=2.32,<3",
 ]
 
 [project.optional-dependencies]

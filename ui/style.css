@@ -119,3 +119,72 @@ footer { display: flex; justify-content: space-between; gap: 12px; color: var(--
 }
 @media (max-width: 340px) { .device-grid { grid-template-columns: 1fr; } .count { display: none; } }
 @media (prefers-reduced-motion: reduce) { *, *::before { animation: none !important; transition: none !important; } }
+/* Capability controls share one quiet glass surface; the host owns backdrop color. */
+:root {
+    --control-fill: color-mix(in srgb, var(--color-surface, #808080) 20%, transparent);
+    --control-edge: color-mix(in srgb, var(--accent) 32%, var(--stroke));
+    --glow: color-mix(in srgb, var(--accent) 11%, transparent);
+    --scroll-thumb: color-mix(in srgb, var(--text) 32%, transparent);
+}
+* { scrollbar-width: thin; scrollbar-color: var(--scroll-thumb) transparent; }
+*::-webkit-scrollbar { width: 7px; height: 7px; }
+*::-webkit-scrollbar-thumb { background: var(--scroll-thumb); border-radius: 7px; }
+*::-webkit-scrollbar-track { background: transparent; }
+body { font-family: var(--font-sans, 'Segoe UI', sans-serif); }
+.device-grid { grid-template-columns: repeat(auto-fill, minmax(min(100%, 290px), 1fr)); align-items: start; gap: 16px; }
+.device-card { padding: 20px; min-height: 190px; box-shadow: inset 0 1px 0 color-mix(in srgb, var(--text) 5%, transparent); }
+.device-card:hover { box-shadow: inset 0 1px 0 var(--glow), 0 0 22px var(--glow); }
+.device-card.is-on { border-color: var(--control-edge); background: radial-gradient(ellipse at 0 0, var(--glow), transparent 75%), var(--glass); }
+.device-name { font-size: 17px; margin-bottom: 20px; }
+.device-meta { font-size: 12px; }
+.capabilities { display: flex; flex-direction: column; gap: 20px; }
+.capability { min-width: 0; }
+.capability-label { display: block; color: var(--text); font-size: 12px; font-weight: 500; margin-bottom: 9px; }
+.capability-state { display: block; font-size: 11px; color: var(--muted); margin-top: 5px; }
+.boolean-control { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; min-height: 34px; }
+.boolean-control .capability-state { margin: 0; }
+.capability-boolean { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.capability-boolean .capability-label { margin-bottom: 0; }
+.capability-boolean:has(.explicit-buttons:not([hidden])) { display: block; }
+.capability-boolean:has(.explicit-buttons:not([hidden])) .capability-label { margin-bottom: 7px; }
+.explicit-buttons { display: flex; gap: 6px; }
+.compact { padding: 7px 10px; min-height: 34px; font-size: 11px; }
+.switch { width: 44px; height: 34px; }
+.slider { top: 5px; bottom: 5px; }
+.switch input:checked + .slider { background: color-mix(in srgb, var(--accent) 35%, transparent); border-color: var(--control-edge); box-shadow: 0 0 13px var(--glow); }
+.range-control { display: grid; grid-template-columns: minmax(60px, 1fr) auto; align-items: center; gap: 10px; }
+.range-control input { width: 100%; min-width: 0; }
+.range-control .btn { grid-column: 1 / -1; justify-self: end; }
+.range-value { font-size: 13px; font-weight: 600; min-width: 46px; text-align: right; font-variant-numeric: tabular-nums; }
+input[type="range"] { height: 28px; margin: 0; accent-color: var(--accent); cursor: pointer; }
+input[type="number"], .capability select { border: 1px solid var(--stroke-strong); border-radius: 9px; color: var(--text); background: var(--control-fill); padding: 9px 10px; font: inherit; font-size: 13px; min-height: 40px; }
+.capability select { width: 100%; max-width: 100%; color-scheme: dark; }
+/* Native selects deliberately keep the OS popup, including keyboard interaction. */
+.capability select option { background: var(--color-surface, #28283f); color: var(--text); }
+.relative-control { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.step-button { font-size: 21px; min-width: 42px; height: 40px; padding: 0; }
+.relative-control .capability-state { margin: 0; text-align: center; }
+.color-control { display: flex; gap: 12px; align-items: center; }
+input[type="color"] { width: 50px; height: 38px; padding: 3px; border: 1px solid var(--stroke-strong); background: var(--glass); border-radius: 9px; cursor: pointer; }
+.sensor-readings { display: flex; flex-direction: column; gap: 11px; margin: 0; }
+.capabilities:not(:empty) + .sensor-readings:not([hidden]) { margin-top: 22px; padding-top: 15px; border-top: 1px solid var(--stroke); }
+.sensor-reading { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; }
+.sensor-label { font-size: 12px; color: var(--muted); }
+.sensor-value { margin: 0; font-size: 16px; font-weight: 550; text-align: right; overflow-wrap: anywhere; }
+.device-message { min-height: 18px; color: var(--muted); font-size: 11px; margin: 14px 0 0; overflow-wrap: anywhere; }
+.secret-field { display: flex; gap: 8px; align-items: center; }
+.secret-field input { min-width: 0; }
+input:disabled, select:disabled { cursor: wait; opacity: .55; }
+select:focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; }
+@media (max-width: 520px) {
+    .device-grid { grid-template-columns: 1fr; }
+    .device-card { padding: 18px; }
+    .device-name { font-size: 16px; }
+    .tabs { flex-wrap: wrap; }
+    .tab-btn { flex: 1 0 calc(50% - 4px); }
+}
+@media (forced-colors: active) {
+    * { scrollbar-color: auto; }
+    .device-card, .slider, .btn { border-color: ButtonText; }
+    .slider::before { background: ButtonText; }
+}

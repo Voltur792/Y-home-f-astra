@@ -4,11 +4,15 @@
 # Local plugin data: the user's OAuth token. NEVER publish!
 data/
 
-# Author's private notes (not for the public repo)
+# Author's private notes / technical docs (not for the public repo)
 публикация.txt
 AGENTS.md
+DESIGN.md
+make_tab_icon.py
 
+# Local caches and test artifacts
 __pycache__/
 *.pyc
+.pytest_cache/
 .venv/
 requirements.lock

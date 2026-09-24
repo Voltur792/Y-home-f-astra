@@ -12,13 +12,14 @@
         <header>
             <div class="header-left">
                 <div class="eyebrow">ЯНДЕКС · УПРАВЛЕНИЕ ДОМОМ</div>
-                <h1>Умный дом<span class="title-dot" aria-hidden="true">.</span></h1>
+                <h1>Умный дом<span class="title-dot" aria-hidden="true"></span></h1>
                 <div id="status" class="status loading" role="status">Подключаемся…</div>
             </div>
             <button id="refresh-btn" class="icon-btn" title="Обновить данные" aria-label="Обновить данные">↻</button>
         </header>
         <nav class="tabs" role="tablist" aria-label="Умный дом">
             <button id="tab-devices" class="tab-btn active" role="tab" aria-selected="true" aria-controls="devices" data-tab="devices">Устройства <span id="devices-count" class="count">—</span></button>
+            <button id="tab-read-only" class="tab-btn" role="tab" aria-selected="false" aria-controls="read-only" tabindex="-1" data-tab="read-only">Только просмотр <span id="read-only-count" class="count">—</span></button>
             <button id="tab-scenarios" class="tab-btn" role="tab" aria-selected="false" aria-controls="scenarios" tabindex="-1" data-tab="scenarios">Сценарии <span id="scenarios-count" class="count">—</span></button>
             <button id="tab-settings" class="tab-btn" role="tab" aria-selected="false" aria-controls="settings" tabindex="-1" data-tab="settings">Настройки</button>
         </nav>
@@ -27,6 +28,11 @@
             <section id="devices" class="tab-content active" role="tabpanel" aria-labelledby="tab-devices">
                 <div class="section-heading"><h2>Ваши устройства</h2><span id="devices-updated" class="updated"></span></div>
                 <div id="device-list" class="device-grid"></div>
+            </section>
+            <section id="read-only" class="tab-content" role="tabpanel" aria-labelledby="tab-read-only">
+                <div class="section-heading"><h2>Датчики и устройства без команд</h2><span id="read-only-updated" class="updated"></span></div>
+                <p class="section-description">Здесь показаны устройства, для которых API сообщает только состояние или не предоставляет доступных команд.</p>
+                <div id="read-only-list" class="device-grid"></div>
             </section>
             <section id="scenarios" class="tab-content" role="tabpanel" aria-labelledby="tab-scenarios">
                 <div class="section-heading"><h2>Одно нажатие — готово</h2><span id="scenarios-updated" class="updated"></span></div>
@@ -40,7 +46,7 @@
                     <p class="section-description">OAuth-токен даёт плагину доступ к устройствам и сценариям вашего дома.</p>
                     <div class="form-group">
                         <label for="token">OAuth-токен</label>
-                        <input type="password" id="token" placeholder="Вставьте токен y0__…" autocomplete="off" spellcheck="false" aria-describedby="token-help">
+                        <div class="secret-field"><input type="password" id="token" placeholder="Вставьте токен y0__…" autocomplete="off" spellcheck="false" aria-describedby="token-help settings-message"><button type="button" id="toggle-token" class="btn compact" aria-label="Показать токен" aria-pressed="false">Показать</button></div>
                         <p id="token-help" class="input-help">Для смены аккаунта введите новый токен.</p>
                     </div>
                     <button id="save-settings" class="btn btn-primary">Проверить и подключить</button>
@@ -60,6 +66,7 @@
         </main>
         <footer>Дом с Алисой <span>Автообновление каждые 10 секунд</span></footer>
     </div>
+    <script src="device-ui.js"></script>
     <script src="script.js"></script>
 </body>
 </html>

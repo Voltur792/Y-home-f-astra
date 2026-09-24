@@ -82,7 +82,7 @@ class YandexSmartHomeAPI:
         """Get detailed info about a specific device."""
         return self._get(f"/v1.0/devices/{device_id}")
 
-    def set_device_capability(self, device_id: str, capability_type: str, capability_instance: str, value: Any) -> bool:
+    def set_device_capability(self, device_id: str, capability_type: str, capability_instance: str, value: Any, relative: bool = False) -> bool:
         """Set a capability state for a device (batch endpoint, one device)."""
         data = {
             "devices": [
@@ -93,7 +93,8 @@ class YandexSmartHomeAPI:
                             "type": capability_type,
                             "state": {
                                 "instance": capability_instance,
-                                "value": value
+                                "value": value,
+                                **({"relative": True} if relative else {}),
                             }
                         }
                     ]

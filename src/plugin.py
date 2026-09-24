@@ -12,6 +12,8 @@ from typing import Any, Dict, Optional
 
 from astra_plugin_sdk import Plugin, tool, ui_page, ui_call, UiContribution
 
+from .tab_icon import TAB_ICON_SVG
+
 logger = logging.getLogger(__name__)
 
 # The token is stored next to the plugin, not in Astra config: the plugin's
@@ -41,7 +43,7 @@ def _load_saved_token() -> Optional[str]:
     return token.strip() if isinstance(token, str) and token.strip() else None
 
 
-@ui_page("yandex-smart-home", "Умный дом", "widget.html", icon_svg='<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path fill="currentColor" d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>')
+@ui_page("yandex-smart-home", "Умный дом", "widget.html", icon_svg=TAB_ICON_SVG)
 class YandexSmartHome(Plugin):
     """Astra plugin: yandex-smart-home."""
 
@@ -131,8 +133,19 @@ class YandexSmartHome(Plugin):
             capability_type = params.get("capability_type") or "devices.capabilities.on_off"
             capability_instance = params.get("capability_instance") or "on"
             value = params.get("value")
+            relative = params.get("relative") is True
 
-            self.api.set_device_capability(device_id, capability_type, capability_instance, value)
+            if not isinstance(device_id, str) or not device_id.strip():
+                return {"error": "Не выбрано устройство"}
+            if not isinstance(capability_type, str) or not capability_type.startswith("devices.capabilities."):
+                return {"error": "Неизвестный параметр устройства"}
+            if not isinstance(capability_instance, str) or not capability_instance.strip():
+                return {"error": "Не указан параметр устройства"}
+
+            if relative:
+                self.api.set_device_capability(device_id, capability_type, capability_instance, value, relative=True)
+            else:
+                self.api.set_device_capability(device_id, capability_type, capability_instance, value)
             return {"success": True}
         except Exception as e:
             logger.error(f"Failed to control device: {e}")

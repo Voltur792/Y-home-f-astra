@@ -1,5 +1,8 @@
 import asyncio
+import base64
+import io
 import json
+from pathlib import Path
 from unittest.mock import Mock
 import pytest
 from src.plugin import YandexSmartHome
@@ -103,3 +106,37 @@ def test_scenario_success():
     api._post = Mock(return_value={'status':'ok'})
     assert api.run_scenario('five')
     api._post.assert_called_once_with('/v1.0/scenarios/five/actions')
+
+def test_plugin_page_contribution_is_transparent():
+    contributions = asyncio.run(YandexSmartHome().get_ui_contributions())
+    assert len(contributions) == 1
+    page = contributions[0]
+    assert page.id == 'yandex-smart-home'
+    assert page.slot == 'page.custom'
+    assert page.transparent is True
+    assert page.icon_svg, 'the tab must carry the embedded icon'
+
+def test_tab_icon_svg_is_self_contained():
+    # Astra's store drops icons carrying scripts or off-machine references.
+    svg = YandexSmartHome._astra_ui_contributions[0].icon_svg
+    assert 'data:image/png;base64,' in svg
+    low = svg.lower()
+    for forbidden in ('<script', 'onload=', 'onerror=', 'foreignobject'):
+        assert forbidden not in low
+    without_ns = low.replace('xmlns="http://www.w3.org/2000/svg"', '')
+    assert 'http://' not in without_ns and 'https://' not in without_ns and 'file://' not in without_ns
+    payload = svg.split('base64,', 1)[1].split('"', 1)[0]
+    assert base64.b64decode(payload)[:8] == b'\x89PNG\r\n\x1a\n'
+
+def test_tab_icon_matches_main_icon():
+    # The tab icon is generated from icon.png: replacing the icon without
+    # regenerating src/tab_icon.py must fail here, not silently disagree.
+    PILImage = pytest.importorskip('PIL.Image')
+    import re
+    from src.tab_icon import TAB_ICON_SVG
+    icon = Path(__file__).resolve().parent.parent / 'icon.png'
+    side = int(re.search(r'viewBox="0 0 (\d+) (\d+)"', TAB_ICON_SVG).group(1))
+    expected = io.BytesIO()
+    PILImage.open(icon).convert('RGBA').resize((side, side), PILImage.Resampling.LANCZOS).save(expected, 'PNG', optimize=True)
+    embedded = base64.b64decode(TAB_ICON_SVG.split('base64,', 1)[1].split('"', 1)[0])
+    assert embedded == expected.getvalue(), 'src/tab_icon.py is stale, regenerate it from icon.png'

@@ -6,6 +6,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const notice = $('notice');
     const resources = {
         devices: { element: $('device-list'), method: 'yandex_home_get_devices', loaded: false, pending: null, generation: 0 },
+        'read-only': { element: $('read-only-list'), method: 'yandex_home_get_devices', loaded: false, pending: null, generation: 0 },
         scenarios: { element: $('scenario-list'), method: 'yandex_home_get_scenarios', loaded: false, pending: null, generation: 0 }
     };
     const busyDevices = new Set();
@@ -92,13 +93,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (!Array.isArray(items)) throw new Error('Плагин вернул некорректный список.');
                 // A read begun before a device action must never undo the action's UI state.
                 if (name === 'devices' && revision !== actionRevision) return;
-                if (name === 'devices') renderDevices(items);
+                if (name === 'devices') renderDevices(items, true);
+                else if (name === 'read-only') renderDevices(items, false);
                 else renderScenarios(items);
                 resource.loaded = true;
                 resource.element.removeAttribute('data-stale');
                 if (resource.lastError && notice.textContent === resource.lastError) announce('');
                 resource.lastError = '';
-                $(name + '-count').textContent = String(items.length);
+                const count = name === 'devices' ? items.filter(isInteractiveDevice).length
+                    : name === 'read-only' ? items.filter(device => !isInteractiveDevice(device)).length : items.length;
+                $(name + '-count').textContent = String(count);
                 $(name + '-updated').textContent = 'Обновлено в ' + new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
                 status('Подключено к Яндексу', true);
             } catch (error) {
@@ -125,89 +129,37 @@ document.addEventListener('DOMContentLoaded', () => {
         return resource.pending;
     }
 
-    function onOff(device) {
-        const cap = (device.capabilities || []).find(c => c.type === 'devices.capabilities.on_off');
-        return cap && cap.state && typeof cap.state.value === 'boolean' ? cap.state.value : null;
-    }
-    function sensorValue(device) {
-        const labels = { temperature: 'Температура', humidity: 'Влажность', battery_level: 'Заряд', illumination: 'Освещённость', pressure: 'Давление', motion: 'Движение', open: 'Открытие', water_leak: 'Протечка' };
-        const property = (device.properties || []).find(p => p.state && p.state.value != null);
-        if (!property) return 'Только просмотр';
-        const value = typeof property.state.value === 'boolean' ? (property.state.value ? 'Да' : 'Нет') : property.state.value;
-        const units = { 'unit.temperature.celsius': '°C', 'unit.temperature.kelvin': 'K', 'unit.percent': '%', 'unit.illumination.lux': 'лк', 'unit.pressure.mmhg': 'мм рт. ст.', 'unit.pressure.pascal': 'Па', 'unit.pressure.bar': 'бар' };
-        const unitId = property.parameters && property.parameters.unit;
-        const defaults = { temperature: '°C', humidity: '%', battery_level: '%' };
-        const unit = unitId ? (units[unitId] || unitId.replace(/^unit\./, '')) : (defaults[property.state.instance] || '');
-        return (labels[property.state.instance] || property.state.instance) + ': ' + value + (unit && typeof property.state.value === 'number' ? ' ' + unit : '');
-    }
-    function updateDevice(card, device) {
-        card.querySelector('.device-name').textContent = device.name || 'Без имени';
-        card.querySelector('.device-meta').textContent = device.room_name || 'Без комнаты';
-        if (busyDevices.has(device.id)) return;
-        const state = onOff(device);
-        const controls = card.querySelector('.device-controls');
-        const previous = controls.querySelector('input');
-        if ((state !== null) !== !!previous) {
-            controls.innerHTML = state === null ? '<span class="device-status"></span>' : '<span class="device-status"></span><label class="switch"><input type="checkbox" class="device-toggle"><span class="slider"></span></label>';
-            const input = controls.querySelector('input');
-            if (input) input.addEventListener('change', () => toggleDevice(device.id, input.checked, card));
+    function isInteractiveDevice(device) { return SmartHomeUI.descriptors(device).length > 0; }
+    function renderDevices(devices, interactive) {
+        const name = interactive ? 'devices' : 'read-only';
+        const container = resources[name].element;
+        devices = devices.filter(device => isInteractiveDevice(device) === interactive);
+        if (!devices.length) {
+            placeholder(container, interactive ? 'Устройств с командами пока нет' : 'Устройств только для просмотра нет', interactive
+                ? 'Доступные для управления устройства появятся здесь.'
+                : 'Датчики и устройства без доступных команд появятся здесь.');
+            return;
         }
-        const input = controls.querySelector('input');
-        if (input) {
-            input.checked = state === true;
-            input.setAttribute('aria-label', 'Питание: ' + (device.name || 'Без имени'));
-        }
-        card.classList.toggle('is-on', state === true);
-        const label = controls.querySelector('.device-status');
-        label.textContent = state === null ? sensorValue(device) : state ? 'Включено' : 'Выключено';
-        label.className = 'device-status' + (state ? ' on' : '');
-    }
-    function renderDevices(devices) {
-        const container = resources.devices.element;
-        if (!devices.length) { placeholder(container, 'Устройств пока нет', 'Добавьте устройства в приложении «Дом с Алисой», затем обновите список.'); return; }
         container.querySelectorAll('.placeholder').forEach(el => el.remove());
         const existing = new Map([...container.querySelectorAll('.device-card')].map(card => [card.dataset.deviceId, card]));
         devices.forEach(device => {
             let card = existing.get(device.id);
-            if (!card) {
-                card = document.createElement('article');
-                card.className = 'device-card';
-                card.dataset.deviceId = device.id;
-                card.innerHTML = '<div class="device-meta"></div><h3 class="device-name"></h3><div class="device-controls"><span class="device-status"></span></div>';
-                container.appendChild(card);
-            }
+            if (!card) { card = SmartHomeUI.createDeviceCard(device, controlDevice); container.appendChild(card); }
+            else SmartHomeUI.updateDeviceCard(card, device);
             existing.delete(device.id);
-            updateDevice(card, device);
         });
         existing.forEach(card => { if (!busyDevices.has(card.dataset.deviceId)) card.remove(); });
     }
-    async function toggleDevice(id, value, card) {
-        if (saving) {
-            card.querySelector('input').checked = !value;
-            announce('Дождитесь завершения подключения аккаунта.');
-            return;
-        }
-        if (busyDevices.has(id)) return;
-        busyDevices.add(id);
+    async function controlDevice(command) {
+        if (saving) throw new Error('Дождитесь завершения подключения аккаунта.');
+        if (busyDevices.has(command.device_id)) throw new Error('Дождитесь завершения предыдущей команды.');
+        busyDevices.add(command.device_id);
         actionRevision++;
-        const input = card.querySelector('input');
-        const label = card.querySelector('.device-status');
-        input.disabled = true;
-        label.textContent = 'Переключение…';
-        let state = !value;
         try {
-            await callBackend('yandex_home_control_device', { device_id: id, capability_type: 'devices.capabilities.on_off', capability_instance: 'on', value });
-            state = value;
-            announce(card.querySelector('.device-name').textContent + ': ' + (value ? 'включено' : 'выключено'));
-        } catch (error) { announce(errorMessage(error), true); }
-        finally {
+            await callBackend('yandex_home_control_device', command);
+        } finally {
             actionRevision++;
-            busyDevices.delete(id);
-            input.checked = state;
-            input.disabled = false;
-            card.classList.toggle('is-on', state);
-            label.textContent = state ? 'Включено' : 'Выключено';
-            label.className = 'device-status' + (state ? ' on' : '');
+            busyDevices.delete(command.device_id);
         }
     }
     function renderScenarios(scenarios) {
@@ -266,7 +218,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!token) { message.textContent = 'Введите OAuth-токен'; message.className = 'message error'; $('token').focus(); return; }
         saving = true;
         $('save-settings').disabled = true;
-        document.querySelectorAll('.device-toggle, .run-scenario-btn').forEach(control => { control.disabled = true; });
+        document.querySelectorAll('.device-card').forEach(card => SmartHomeUI.lockDevice(card, true));
+        document.querySelectorAll('.run-scenario-btn').forEach(control => { control.disabled = true; });
         message.textContent = 'Проверяем подключение…';
         message.className = 'message';
         // Old-account responses must not enter the refreshed UI after saving another token.
@@ -295,10 +248,18 @@ document.addEventListener('DOMContentLoaded', () => {
         finally {
             saving = false;
             $('save-settings').disabled = false;
-            document.querySelectorAll('.device-toggle, .run-scenario-btn').forEach(control => { control.disabled = false; });
+            document.querySelectorAll('.device-card').forEach(card => SmartHomeUI.lockDevice(card, false));
+            document.querySelectorAll('.run-scenario-btn').forEach(control => { control.disabled = false; });
             refreshState();
         }
         if (saved) await Promise.all([load('devices'), load('scenarios')]);
+    });
+    $('toggle-token').addEventListener('click', () => {
+        const input = $('token'), reveal = input.type === 'password';
+        input.type = reveal ? 'text' : 'password';
+        $('toggle-token').textContent = reveal ? 'Скрыть' : 'Показать';
+        $('toggle-token').setAttribute('aria-label', reveal ? 'Скрыть токен' : 'Показать токен');
+        $('toggle-token').setAttribute('aria-pressed', String(reveal));
     });
     load('devices');
     const timer = setInterval(() => { if (!document.hidden && !saving && !busyDevices.size && !busyScenarios.size) load(activeTab); }, 10000);

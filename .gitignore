@@ -15,4 +15,5 @@ __pycache__/
 *.pyc
 .pytest_cache/
 .venv/
+.astra-venv.json
 requirements.lock

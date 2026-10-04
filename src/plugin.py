@@ -1,6 +1,7 @@
 """YandexSmartHome - Astra plugin for controlling Yandex Smart Home devices."""
 
 import ast
+import asyncio
 import json
 import logging
 import os
@@ -67,6 +68,17 @@ class YandexSmartHome(Plugin):
     async def on_config_changed(self, config: Dict[str, Any]):
         """Called on start with initial config and on any config change."""
         self._ensure_api()
+        from .timer_integration import IntegrationServer
+        if not hasattr(self, "_timer_bridge"):
+            self._timer_bridge = IntegrationServer("home", {
+                "devices": self.ui_get_devices, "scenarios": self.ui_get_scenarios,
+                "device": self.ui_control_device, "scenario": self.ui_run_scenario,
+            })
+        self._timer_bridge.start(asyncio.get_running_loop())
+
+    async def on_shutdown(self):
+        if hasattr(self, "_timer_bridge"):
+            await asyncio.to_thread(self._timer_bridge.close)
 
     def _ensure_api(self):
         """Lazily create the API client from the saved token."""

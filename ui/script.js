@@ -48,6 +48,8 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         refreshState();
         if (resources[name]) load(name);
+        if (name === 'voice') VoiceCommands.show();
+        if (name === 'widgets') HomeWidgets.show();
     }
     tabs.forEach((tab, index) => {
         tab.addEventListener('click', () => selectTab(tab.dataset.tab));
@@ -210,7 +212,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (saving) return;
         const token = $('token').value.trim();
         const message = $('settings-message');
-        if (busyDevices.size || busyScenarios.size) {
+        if (busyDevices.size || busyScenarios.size || VoiceCommands.isBusy()) {
             message.textContent = 'Дождитесь завершения команды умного дома, затем повторите подключение.';
             message.className = 'message error';
             return;
@@ -252,7 +254,7 @@ document.addEventListener('DOMContentLoaded', () => {
             document.querySelectorAll('.run-scenario-btn').forEach(control => { control.disabled = false; });
             refreshState();
         }
-        if (saved) await Promise.all([load('devices'), load('scenarios')]);
+        if (saved) { VoiceCommands.reset(); HomeWidgets.reset(); await Promise.all([load('devices'), load('scenarios')]); }
     });
     $('toggle-token').addEventListener('click', () => {
         const input = $('token'), reveal = input.type === 'password';

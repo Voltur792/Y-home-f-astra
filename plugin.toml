@@ -1,7 +1,7 @@
 [plugin]
 id = "yandex-smart-home"
 name = "Yandex Smart Home"
-version = "0.1.4"
+version = "0.5.1"
 description = "Plugin for controlling Yandex Smart Home devices directly from Astra."
 author = "Voltur"
 license = "MIT"
@@ -13,6 +13,7 @@ runtimes = ["python"]
 
 [capabilities]
 tools = true
+actions = true
 ui_contributions = true
 
 [permissions]

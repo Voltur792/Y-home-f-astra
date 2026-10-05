@@ -16,4 +16,7 @@ __pycache__/
 .pytest_cache/
 .venv/
 .astra-venv.json
-requirements.lock
+# Local diagnostic helper; not part of the published plugin
+/scripts/test-desktop-widget-native.py
+.tmp-*/
+*.log

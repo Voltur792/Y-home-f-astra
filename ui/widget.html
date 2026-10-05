@@ -11,16 +11,17 @@
     <div class="container">
         <header>
             <div class="header-left">
-                <div class="eyebrow">ЯНДЕКС · УПРАВЛЕНИЕ ДОМОМ</div>
-                <h1>Умный дом<span class="title-dot" aria-hidden="true"></span></h1>
-                <div id="status" class="status loading" role="status">Подключаемся…</div>
+                <h1>Умный дом</h1>
+                <p class="subtitle">Устройства, сценарии и голосовые команды Яндекса</p>
             </div>
-            <button id="refresh-btn" class="icon-btn" title="Обновить данные" aria-label="Обновить данные">↻</button>
+            <div class="header-status"><div id="status" class="status loading" role="status">Подключаемся…</div><button id="refresh-btn" class="icon-btn" title="Обновить данные" aria-label="Обновить данные">↻</button></div>
         </header>
         <nav class="tabs" role="tablist" aria-label="Умный дом">
             <button id="tab-devices" class="tab-btn active" role="tab" aria-selected="true" aria-controls="devices" data-tab="devices">Устройства <span id="devices-count" class="count">—</span></button>
             <button id="tab-read-only" class="tab-btn" role="tab" aria-selected="false" aria-controls="read-only" tabindex="-1" data-tab="read-only">Только просмотр <span id="read-only-count" class="count">—</span></button>
             <button id="tab-scenarios" class="tab-btn" role="tab" aria-selected="false" aria-controls="scenarios" tabindex="-1" data-tab="scenarios">Сценарии <span id="scenarios-count" class="count">—</span></button>
+            <button id="tab-voice" class="tab-btn" role="tab" aria-selected="false" aria-controls="voice" tabindex="-1" data-tab="voice">Голосовые команды</button>
+            <button id="tab-widgets" class="tab-btn" role="tab" aria-selected="false" aria-controls="widgets" tabindex="-1" data-tab="widgets">Виджеты</button>
             <button id="tab-settings" class="tab-btn" role="tab" aria-selected="false" aria-controls="settings" tabindex="-1" data-tab="settings">Настройки</button>
         </nav>
         <div id="notice" class="notice" role="status" aria-live="polite" hidden></div>
@@ -38,6 +39,60 @@
                 <div class="section-heading"><h2>Одно нажатие — готово</h2><span id="scenarios-updated" class="updated"></span></div>
                 <p class="section-description">Сценарии из вашего аккаунта «Дом с Алисой».</p>
                 <div id="scenario-list" class="scenario-list"></div>
+            </section>
+            <section id="voice" class="tab-content" role="tabpanel" aria-labelledby="tab-voice">
+                <div class="section-heading"><h2>Скажите — дом выполнит</h2><button id="voice-refresh" type="button" class="btn">Обновить список</button></div>
+                <p class="section-description">Свяжите свои фразы с устройством или сценарием. Astra выполнит точную команду напрямую, без обращения к ИИ.</p>
+                <p class="input-help">Обращение «Астра» поддерживается автоматически. Новые фразы применяются после полного выхода и запуска Astra; действие и значение уже добавленной команды можно менять сразу.</p>
+                <div id="voice-restart" class="notice" role="status" hidden></div>
+                <div class="voice-layout">
+                    <form id="voice-form" class="settings-card">
+                        <h3 id="voice-form-title">Новая команда</h3>
+                        <div class="form-group"><label for="voice-name">Название (необязательно)</label><input id="voice-name" maxlength="120" placeholder="Например, свет в гостиной"></div>
+                        <div class="form-group"><label for="voice-phrases">Что сказать</label><textarea id="voice-phrases" rows="3" maxlength="3300" required placeholder="включи свет в гостиной&#10;зажги свет в гостиной" aria-describedby="voice-phrase-help"></textarea><p id="voice-phrase-help" class="input-help">Одна фраза на строку. Совпадение точное; фразы должны отличаться от других команд Astra.</p></div>
+                        <div class="form-group"><label for="voice-kind">Что запустить</label><select id="voice-kind"><option value="device">Устройство</option><option value="scenario">Сценарий</option></select></div>
+                        <div class="form-group"><label for="voice-target">Устройство или сценарий</label><select id="voice-target" required><option value="">Загружаем список…</option></select></div>
+                        <div id="voice-action-group" class="form-group"><label for="voice-action">Действие</label><select id="voice-action" required></select></div>
+                        <div id="voice-value-group" class="form-group"><label for="voice-value">Значение</label><div id="voice-value-host"></div><p id="voice-value-help" class="input-help"></p></div>
+                        <label class="voice-enabled"><input id="voice-enabled" type="checkbox" checked> Команда включена</label>
+                        <div class="voice-buttons"><button id="voice-save" class="btn btn-primary" type="submit">Сохранить команду</button><button id="voice-cancel" class="btn" type="button" hidden>Отменить</button></div>
+                        <div id="voice-message" class="message" role="status" aria-live="polite"></div>
+                    </form>
+                    <div class="voice-list-panel"><h3 class="voice-list-title">Ваши команды</h3><div id="voice-list" class="scenario-list" aria-live="polite"></div><nav class="list-pager" aria-label="Страницы команд"><button id="voice-prev" class="btn compact" type="button" aria-label="Предыдущие команды">←</button><span id="voice-page-label" role="status"></span><button id="voice-next" class="btn compact" type="button" aria-label="Следующие команды">→</button></nav></div>
+                </div>
+            </section>
+            <section id="widgets" class="tab-content" role="tabpanel" aria-labelledby="tab-widgets">
+                <div class="section-heading"><h2>Показатели на рабочем столе</h2><button id="widgets-refresh" class="btn" type="button">Обновить показатели</button></div>
+                <p class="section-description">Соберите свой виджет из датчиков дома и показателей компьютера. Перетаскивайте окно за заголовок.</p>
+                <div class="voice-layout">
+                    <form id="widget-form" class="settings-card">
+                        <h3 id="widget-form-title">Новый виджет</h3>
+                        <div class="form-group"><label for="widget-title">Название</label><input id="widget-title" required maxlength="80" value="Мой дом"></div>
+                        <div class="form-group"><label for="widget-source">Добавить показатель</label><select id="widget-source"><option value="">Загрузка…</option></select></div>
+                        <button id="widget-add-source" type="button" class="btn compact">Добавить показатель</button>
+                        <div id="widget-items" class="widget-items" aria-live="polite"></div>
+                        <div class="widget-colors">
+                            <div class="form-group"><label for="widget-background">Цвет фона</label><input id="widget-background" type="color" value="#25243b"></div>
+                            <div class="form-group"><label for="widget-foreground">Цвет текста</label><input id="widget-foreground" type="color" value="#ffffff"></div>
+                            <div class="form-group"><label for="widget-accent">Цвет шкал</label><input id="widget-accent" type="color" value="#a78bfa"></div>
+                        </div>
+                        <div class="form-group"><label for="widget-background-file">Картинка фона</label><input id="widget-background-file" type="file" accept="image/png,image/jpeg,image/webp" aria-describedby="widget-background-help"><p id="widget-background-help" class="input-help">PNG, JPG или WebP. Большие картинки автоматически уменьшаются для виджета. Прозрачность окна применяется и к фону.</p><button id="widget-background-remove" class="btn compact" type="button" hidden>Убрать картинку</button></div>
+                        <div class="form-group"><label for="widget-transparency">Прозрачность окна: <output id="widget-transparency-value">10%</output></label><input id="widget-transparency" type="range" min="0" max="80" value="10"></div>
+                        <div class="widget-colors">
+                            <div class="form-group"><label for="widget-width">Ширина, пикс.</label><input id="widget-width" type="number" min="240" max="800" value="340" required></div>
+                            <div class="form-group"><label for="widget-font-size">Размер текста</label><input id="widget-font-size" type="number" min="10" max="28" value="13" required></div>
+                            <div class="form-group"><label for="widget-refresh-seconds">Обновление, сек.</label><input id="widget-refresh-seconds" type="number" min="1" max="300" value="1" required aria-describedby="widget-refresh-help"></div>
+                        </div>
+                        <p id="widget-refresh-help" class="input-help">От 1 секунды. Дом обновляется по данным Яндекса, компьютер — локально. Частота новых показаний зависит также от самого датчика.</p>
+                        <label class="voice-enabled"><input id="widget-enabled" type="checkbox" checked> Показывать на рабочем столе</label>
+                        <label class="voice-enabled"><input id="widget-on-top" type="checkbox"> Поверх других окон</label>
+                        <label class="voice-enabled"><input id="widget-rounded" type="checkbox" checked> Скруглить углы</label>
+                        <label class="voice-enabled"><input id="widget-bars" type="checkbox" checked> Шкалы для числовых показателей</label>
+                        <div class="voice-buttons"><button id="widget-save" class="btn btn-primary" type="submit">Создать виджет</button><button id="widget-cancel" class="btn" type="button" hidden>Отменить</button></div>
+                        <div id="widget-message" class="message" role="status"></div>
+                    </form>
+                    <div class="voice-list-panel"><h3>Предпросмотр</h3><div id="widget-preview"></div><h3 class="widget-list-heading">Ваши виджеты</h3><div id="widget-list" class="scenario-list"></div><p id="widgets-availability" class="input-help"></p></div>
+                </div>
             </section>
             <section id="settings" class="tab-content" role="tabpanel" aria-labelledby="tab-settings">
                 <div class="settings-card">
@@ -67,6 +122,9 @@
         <footer>Дом с Алисой <span>Автообновление каждые 10 секунд</span></footer>
     </div>
     <script src="device-ui.js"></script>
+    <script src="voice-fields.js"></script>
+    <script src="voice-commands.js"></script>
+    <script src="widgets.js"></script>
     <script src="script.js"></script>
 </body>
 </html>

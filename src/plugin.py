@@ -2,16 +2,19 @@
 
 import ast
 import asyncio
+import hashlib
 import json
 import logging
 import os
 import re
 import sys
 import traceback
+import threading
+import uuid
 from pathlib import Path
 from typing import Any, Dict, Optional
 
-from astra_plugin_sdk import Plugin, tool, ui_page, ui_call, UiContribution
+from astra_plugin_sdk import Plugin, tool, ui_page, ui_call, UiContribution, ActionTypeDef, FieldDef
 
 from .tab_icon import TAB_ICON_SVG
 
@@ -51,6 +54,139 @@ class YandexSmartHome(Plugin):
     def __init__(self):
         super().__init__()
         self.api = None
+        self._voice_writer = None
+        self._widgets = None
+        self._widgets_lock = threading.Lock()
+        try:
+            self._voice_active = {entry["id"]: entry for entry in self._voice_state().get("applied_entries", [])}
+        except Exception as error:
+            logger.error("Could not load voice commands: %s", error)
+            self._voice_active = {}
+
+    def _voice_state(self):
+        from .voice_commands import read_json
+        state = read_json(DATA_DIR / "voice-commands.json", {"entries": [], "revision": 0, "applied_revision": 0})
+        if not isinstance(state, dict) or not isinstance(state.get("entries"), list):
+            raise ValueError("Не удалось прочитать настройки голосовых команд")
+        return state
+
+    def _voice_account(self):
+        return hashlib.sha256((_load_saved_token() or "").encode()).hexdigest()
+
+    def _ensure_voice_writer(self):
+        from .voice_commands import start_writer, commands_path
+        if self._voice_writer is None or self._voice_writer.poll() is not None:
+            self._voice_writer = start_writer(DATA_DIR / "voice-commands.json", commands_path())
+
+    def _save_voice_state(self, state):
+        from .voice_commands import atomic_json
+        self._ensure_voice_writer()
+        state["revision"] = state.get("revision", 0) + 1
+        state.pop("apply_error", None)
+        atomic_json(DATA_DIR / "voice-commands.json", state)
+
+    def _voice_restart_required(self, state):
+        # A target/value can be changed live under the already registered UUID.
+        registered = state.get("applied_entries", [])
+        signature = lambda e: (e["id"], e["phrases"], e["enabled"])
+        return (state.get("trigger_version", 1) < 2 and bool(state["entries"])) or \
+            list(map(signature, state["entries"])) != list(map(signature, registered))
+
+    @ui_call("yandex_home_get_voice_commands")
+    def ui_get_voice_commands(self, **params: Any):
+        try:
+            state = self._voice_state()
+            # Account fingerprints are an internal guard, not UI data.
+            entries = [{k: v for k, v in e.items() if k != "account"} for e in state["entries"]]
+            return {"entries": entries, "restart_required": self._voice_restart_required(state),
+                    "apply_error": state.get("apply_error", "")}
+        except Exception as error:
+            return {"error": str(error)}
+
+    @ui_call("yandex_home_save_voice_command")
+    def ui_save_voice_command(self, **params: Any):
+        from .voice_commands import validate_phrases, validate_target, read_json, commands_path
+        try:
+            self._ensure_api()
+            if self.api is None:
+                return {"error": "not_configured"}
+            state = self._voice_state()
+            ident = params.get("id") or ""
+            previous = next((e for e in state["entries"] if e["id"] == ident), None)
+            if ident and previous is None:
+                raise ValueError("Команда уже удалена. Обновите список")
+            phrases = validate_phrases(params.get("phrases"), state["entries"], read_json(commands_path(), []), ident)
+            target = validate_target(params.get("target"), self.api.get_user_info())
+            name = params.get("name") or phrases[0]
+            if not isinstance(name, str) or not 1 <= len(name.strip()) <= 120:
+                raise ValueError("Название должно содержать от 1 до 120 символов")
+            entry = {"id": ident or str(uuid.uuid4()), "name": name.strip(), "phrases": phrases,
+                     "enabled": params.get("enabled") is not False, "target": target, "account": self._voice_account()}
+            state["entries"] = [entry if e["id"] == ident else e for e in state["entries"]] if previous else state["entries"] + [entry]
+            self._save_voice_state(state)
+            return {"success": True, "id": entry["id"], "restart_required": self._voice_restart_required(state)}
+        except Exception as error:
+            return {"error": str(error)}
+
+    @ui_call("yandex_home_change_voice_command")
+    def ui_change_voice_command(self, **params: Any):
+        try:
+            state = self._voice_state()
+            entry = next((e for e in state["entries"] if e["id"] == params.get("id")), None)
+            if entry is None:
+                raise ValueError("Команда уже удалена. Обновите список")
+            if params.get("delete") is True:
+                state["entries"].remove(entry)
+            elif type(params.get("enabled")) is bool:
+                entry["enabled"] = params["enabled"]
+            else:
+                raise ValueError("Не указано изменение команды")
+            self._save_voice_state(state)
+            return {"success": True, "restart_required": True}
+        except Exception as error:
+            return {"error": str(error)}
+
+    async def get_action_types(self):
+        actions = await super().get_action_types()
+        actions.append(ActionTypeDef(type="voice_saved", label="Умный дом: сохранённая команда",
+                                     fields=[FieldDef(id="command_name", label="Название команды",
+                                                      description="Точное название из вкладки Умный дом → Голосовые команды")]))
+        return actions + [ActionTypeDef(type="voice_" + e["id"].replace("-", ""),
+                                       label="Умный дом — " + e["name"], hidden=True)
+                          for e in self._voice_active.values()]
+
+    async def execute_action(self, action_type: str, params_json: str):
+        if action_type == "voice_saved":
+            try:
+                name = json.loads(params_json or "{}").get("command_name", "")
+                matches = [e for e in self._voice_active.values() if e["name"].casefold() == name.strip().casefold()]
+            except (ValueError, TypeError, AttributeError):
+                matches = []
+            if len(matches) != 1:
+                return {"success": False, "error": "Укажите уникальное название сохранённой команды из вкладки Умный дом → Голосовые команды"}
+            action_type = "voice_" + matches[0]["id"].replace("-", "")
+        if not action_type.startswith("voice_"):
+            return await super().execute_action(action_type, params_json)
+        entry = next((e for e in self._voice_active.values()
+                      if "voice_" + e["id"].replace("-", "") == action_type), None)
+        if entry is None:
+            return {"success": False, "error": "Команда не найдена. Перезапустите Astra"}
+        desired = next((e for e in self._voice_state()["entries"] if e["id"] == entry["id"]), None)
+        if desired is None or not desired["enabled"] or desired["phrases"] != entry["phrases"]:
+            return {"success": False, "error": "Команда изменена или отключена. Перезапустите Astra"}
+        entry = desired
+        if entry.get("account") != self._voice_account():
+            return {"success": False, "error": "Аккаунт Яндекса изменён. Настройте голосовую команду заново"}
+        target = entry["target"]
+        if target["kind"] == "scenario":
+            result = await asyncio.to_thread(self.ui_run_scenario, scenario_id=target["target_id"])
+        else:
+            result = await asyncio.to_thread(self.ui_control_device, device_id=target["target_id"],
+                                           capability_type=target["capability_type"], capability_instance=target["capability_instance"],
+                                           value=target["value"], relative=target.get("relative", False))
+        if result.get("error"):
+            return {"success": False, "error": result["error"]}
+        return {"success": True, "result": "Команда «" + entry["name"] + "» выполнена."}
 
     async def call_tool(self, name: str, arguments_json: str) -> dict:
         """Keep Russian names readable at the SDK transport boundary."""
@@ -68,17 +204,88 @@ class YandexSmartHome(Plugin):
     async def on_config_changed(self, config: Dict[str, Any]):
         """Called on start with initial config and on any config change."""
         self._ensure_api()
+        try:
+            state = self._voice_state()
+            if state.get("revision", 0) != state.get("applied_revision", 0) or self._voice_restart_required(state):
+                self._ensure_voice_writer()
+        except Exception as error:
+            logger.warning("Pending voice commands could not be scheduled: %s", error)
         from .timer_integration import IntegrationServer
         if not hasattr(self, "_timer_bridge"):
             self._timer_bridge = IntegrationServer("home", {
                 "devices": self.ui_get_devices, "scenarios": self.ui_get_scenarios,
                 "device": self.ui_control_device, "scenario": self.ui_run_scenario,
+                "widget_snapshot": self._widget_snapshot, "widget_report": self._widget_report,
             })
         self._timer_bridge.start(asyncio.get_running_loop())
+        try:
+            self._desktop_widgets().start()
+        except Exception as error:
+            logger.error('Could not start desktop widgets: %s', error)
 
     async def on_shutdown(self):
+        if self._widgets:
+            await asyncio.to_thread(self._widgets.close)
         if hasattr(self, "_timer_bridge"):
             await asyncio.to_thread(self._timer_bridge.close)
+
+    def _desktop_widgets(self):
+        with self._widgets_lock:
+            if self._widgets is None:
+                from .desktop_widgets import DesktopWidgets
+                self._widgets = DesktopWidgets(DATA_DIR, self.ui_get_devices, self._voice_account)
+            return self._widgets
+
+    @ui_call('yandex_home_widget_catalog')
+    def ui_widget_catalog(self, **params: Any):
+        try:
+            return self._desktop_widgets().catalog()
+        except Exception as error:
+            return {'error': str(error)}
+
+    @ui_call('yandex_home_widgets_state')
+    def ui_widgets_state(self, **params: Any):
+        try:
+            return self._desktop_widgets().state()
+        except Exception as error:
+            return {'error': str(error)}
+
+    @ui_call('yandex_home_widget_save')
+    def ui_widget_save(self, **params: Any):
+        try:
+            return self._desktop_widgets().save(params.get('settings'), params.get('id', ''))
+        except Exception as error:
+            return {'error': str(error)}
+
+    @ui_call('yandex_home_widget_image_upload')
+    def ui_widget_image_upload(self, **params: Any):
+        try:
+            from .widget_images import store_image
+            return store_image(DATA_DIR, params.get('data'))
+        except Exception as error:
+            return {'error': str(error)}
+
+    @ui_call('yandex_home_widget_image_preview')
+    def ui_widget_image_preview(self, **params: Any):
+        try:
+            from .widget_images import image_preview
+            return image_preview(DATA_DIR, params.get('image_id'))
+        except Exception as error:
+            return {'error': str(error)}
+
+    @ui_call('yandex_home_widget_change')
+    def ui_widget_change(self, **params: Any):
+        try:
+            return self._desktop_widgets().change(params.get('id'), enabled=params.get('enabled'),
+                delete=params.get('delete') is True, reset_position=params.get('reset_position') is True)
+        except Exception as error:
+            return {'error': str(error)}
+
+    def _widget_snapshot(self, **params: Any):
+        return self._desktop_widgets().snapshot(**params)
+
+    def _widget_report(self, **params: Any):
+        return self._desktop_widgets().report(**params)
 
     def _ensure_api(self):
         """Lazily create the API client from the saved token."""

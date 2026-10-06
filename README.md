@@ -6,6 +6,8 @@
 English: An Astra plugin to control Yandex Smart Home devices from Astra —
 via the built-in AI or a dedicated tab.
 
+❗❗❗ Важно: Для использования всех функций плагина начиная с версии 0.1.4, необходимо скачать Source code (zip), распаковать, далее в Разработке Загрузить плагин через Обзор
+
 ## Возможности
 
 - **Вкладка «Умный дом»** в панели навигации Astra:

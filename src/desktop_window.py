@@ -3,12 +3,23 @@ import ctypes
 import queue
 import sys
 import threading
-import tkinter as tk
 from .timer_integration import integration_call
 from .widget_appearance import BackgroundImage, set_application_identity, set_window_icon
 
 
 def run_window(ident, session):
+    if sys.platform != 'win32':
+        from .portable_window import run_widget
+        def snapshot():
+            return integration_call('home', 'widget_snapshot', id=ident, session=session)
+        def hide():
+            return integration_call('home', 'widget_report', id=ident, session=session, closed=True)
+        def command(name, _timer_id, _state):
+            if name != 'hide':
+                raise ValueError('Доступно только скрытие виджета')
+            return hide()
+        return run_widget('Умный дом', snapshot, command, hide)
+    import tkinter as tk
     set_application_identity()
     root = tk.Tk()
     root.withdraw()

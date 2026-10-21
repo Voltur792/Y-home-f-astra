@@ -60,6 +60,14 @@ class SystemMetrics:
             if time.monotonic() - self.updated < 1:
                 return dict(self.values)
             values = {}
+            if os.name != 'nt':
+                try:
+                    import psutil
+                    memory = psutil.virtual_memory()
+                    values.update(cpu_percent=psutil.cpu_percent(interval=None), ram_percent=memory.percent,
+                                  ram_used_gb=round((memory.total-memory.available)/2**30, 1), ram_total_gb=round(memory.total/2**30, 1))
+                except (ImportError, OSError):
+                    pass  # Unavailable metrics stay absent; never report a fake zero.
             if os.name == 'nt':
                 from ctypes import wintypes
                 class Memory(ctypes.Structure):

@@ -1,6 +1,6 @@
 [project]
 name = "yandex_smart_home"
-version = "0.5.1"
+version = "0.6.0"
 description = "An Astra plugin"
 requires-python = ">=3.10"
 dependencies = [
@@ -9,6 +9,9 @@ dependencies = [
     "protobuf>=4.25.0",
     "requests>=2.32,<3",
     "Pillow>=11.3,<13",
+    "pywebview[qt]>=6,<7; sys_platform == \"linux\"",
+    "pywebview>=6,<7; sys_platform == \"darwin\"",
+    "psutil>=6,<8; sys_platform != \"win32\"",
 ]
 
 [project.optional-dependencies]

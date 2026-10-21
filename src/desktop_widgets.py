@@ -87,7 +87,7 @@ class DesktopWidgets:
         self.sources, self.device_error, self.updated, self.last_fetch = {}, '', '', 0
         self.source_account = ''
         self.failures = 0
-        self.available = os.name == 'nt'
+        self.available = sys.platform in ('win32', 'linux', 'darwin')
         stored = read_json(self.path, {'widgets': []})
         if not isinstance(stored, dict) or not isinstance(stored.get('widgets'), list):
             raise ValueError('Не удалось прочитать настройки виджетов')
@@ -233,7 +233,7 @@ class DesktopWidgets:
                 try:
                     # Avoid the venv redirector's extra process while using the
                     # plugin's installed image dependency with the same Python ABI.
-                    pythonw = Path(getattr(sys, '_base_executable', sys.executable)).with_name('pythonw.exe')
+                    pythonw = Path(getattr(sys, '_base_executable', sys.executable)).with_name('pythonw.exe') if os.name == 'nt' else Path(sys.executable)
                     if not pythonw.is_file():
                         raise RuntimeError('Не найден Python для окна виджета')
                     self.sessions[ident] = secrets.token_urlsafe(24)
@@ -242,7 +242,7 @@ class DesktopWidgets:
                         sysconfig.get_path('purelib'), sysconfig.get_path('platlib'), environment.get('PYTHONPATH', '')]))
                     self.processes[ident] = subprocess.Popen([str(pythonw), '-m', 'src.desktop_window', ident, self.sessions[ident]],
                         cwd=str(Path(__file__).resolve().parent.parent), stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
-                        stderr=subprocess.DEVNULL, creationflags=subprocess.CREATE_NO_WINDOW, env=environment)
+                        stderr=subprocess.DEVNULL, creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0) if os.name == 'nt' else 0, env=environment)
                 except Exception as exc:
                     self.errors[ident] = str(exc)
 

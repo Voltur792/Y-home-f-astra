@@ -26,9 +26,8 @@ def commands_path():
     override = os.environ.get("YSH_COMMANDS_FILE")
     if override:
         return Path(override)
-    if os.name == "nt":
-        return Path(os.environ["APPDATA"]) / "astra/astra/config/commands.json"
-    return Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")) / "astra/commands.json"
+    from .platform_support import astra_config
+    return astra_config() / "commands.json"
 
 
 def read_json(path, default):
@@ -238,7 +237,16 @@ def open_host_handle(starting_pid=None):
     if os.name != "nt":
         # Linux: plugin is spawned by the daemon; verify its executable.
         pid = os.getppid()
-        name = Path(os.readlink(f"/proc/{pid}/exe")).name.casefold()
+        if sys.platform == "darwin":
+            libproc = ctypes.CDLL("/usr/lib/libproc.dylib")
+            libproc.proc_pidpath.argtypes = [ctypes.c_int, ctypes.c_void_p, ctypes.c_uint32]
+            libproc.proc_pidpath.restype = ctypes.c_int
+            buffer = ctypes.create_string_buffer(4096)
+            if libproc.proc_pidpath(pid, buffer, len(buffer)) <= 0:
+                raise RuntimeError("Не удалось определить родительский процесс Astra")
+            name = Path(os.fsdecode(buffer.value)).name.casefold()
+        else:
+            name = Path(os.readlink(f"/proc/{pid}/exe")).name.casefold()
         if name not in ("astra", "astra-daemon"):
             raise RuntimeError("Сохранение доступно при запуске плагина из Astra")
         return pid
@@ -372,7 +380,7 @@ def start_writer(store_path, astra_path):
 
 
 def wait_host(pid, ready=None):
-    if os.name == "nt":
+    if sys.platform == "win32":
         from ctypes import wintypes
         kernel = ctypes.WinDLL("kernel32", use_last_error=True)
         kernel.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
@@ -393,7 +401,13 @@ def wait_host(pid, ready=None):
     else:
         if ready:
             ready.write_text("ready", encoding="utf-8")
-        while Path(f"/proc/{pid}").exists():
+        while True:
+            try:
+                os.kill(pid, 0)
+            except ProcessLookupError:
+                break
+            except PermissionError as exc:
+                raise RuntimeError("Нет разрешения проверить завершение Astra; команды не изменены") from exc
             time.sleep(.2)
 
 

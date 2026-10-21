@@ -5,6 +5,9 @@ from src.timer_integration import integration_call
 
 def test_timer_bridge_uses_home_client_and_propagates_action_errors(tmp_path, monkeypatch):
     monkeypatch.setenv("SPT_INTEGRATION_DIR", str(tmp_path / "bridge"))
+    def no_reverse_dns(*args):
+        raise AssertionError("Loopback startup must not depend on DNS")
+    monkeypatch.setattr("socket.getfqdn", no_reverse_dns)
     monkeypatch.setattr("src.plugin.DATA_DIR", tmp_path)
     monkeypatch.setattr("src.plugin.SETTINGS_FILE", tmp_path / "settings.json")
     calls = []

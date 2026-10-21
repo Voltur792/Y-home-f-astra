@@ -139,4 +139,8 @@ def test_tab_icon_matches_main_icon():
     expected = io.BytesIO()
     PILImage.open(icon).convert('RGBA').resize((side, side), PILImage.Resampling.LANCZOS).save(expected, 'PNG', optimize=True)
     embedded = base64.b64decode(TAB_ICON_SVG.split('base64,', 1)[1].split('"', 1)[0])
-    assert embedded == expected.getvalue(), 'src/tab_icon.py is stale, regenerate it from icon.png'
+    # PNG/zlib encoders can emit different bytes for the same pixels on each OS.
+    rendered = PILImage.open(io.BytesIO(embedded)).convert('RGBA')
+    wanted = PILImage.open(io.BytesIO(expected.getvalue())).convert('RGBA')
+    assert rendered.size == wanted.size
+    assert rendered.tobytes() == wanted.tobytes(), 'src/tab_icon.py is stale, regenerate it from icon.png'

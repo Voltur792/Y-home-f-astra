@@ -7,7 +7,9 @@ import json
 import os
 import secrets
 import threading
+import tempfile
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from socketserver import TCPServer
 from pathlib import Path
 from urllib.error import URLError
 from urllib.request import Request, ProxyHandler, build_opener
@@ -78,13 +80,26 @@ class IntegrationServer:
                 except (BrokenPipeError, ConnectionResetError):
                     pass
 
-        self.server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        class LocalServer(ThreadingHTTPServer):
+            def server_bind(self):
+                # This endpoint is loopback-only; reverse DNS may stall startup
+                # on systems without a working local hostname resolver.
+                TCPServer.server_bind(self)
+                self.server_name = "localhost"
+                self.server_port = self.server_address[1]
+
+        self.server = LocalServer(("127.0.0.1", 0), Handler)
         self.server.daemon_threads = True
         path = registry_dir() / (self.name + ".json")
         path.parent.mkdir(parents=True, exist_ok=True)
-        tmp = path.with_suffix(".tmp")
-        tmp.write_text(json.dumps({"port": self.server.server_port, "token": self.token}), encoding="utf-8")
-        tmp.replace(path)
+        with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", dir=path.parent,
+                                         prefix=self.name + "-", suffix=".tmp", delete=False) as output:
+            tmp = Path(output.name)
+            output.write(json.dumps({"port": self.server.server_port, "token": self.token}))
+        try:
+            tmp.replace(path)
+        finally:
+            tmp.unlink(missing_ok=True)
         threading.Thread(target=self.server.serve_forever, daemon=True, name=self.name + "-integration").start()
 
     def close(self):

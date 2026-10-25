@@ -1,8 +1,5 @@
 import asyncio
-import base64
-import io
 import json
-from pathlib import Path
 from unittest.mock import Mock
 import pytest
 from src.plugin import YandexSmartHome
@@ -119,28 +116,15 @@ def test_plugin_page_contribution_is_transparent():
 def test_tab_icon_svg_is_self_contained():
     # Astra's store drops icons carrying scripts or off-machine references.
     svg = YandexSmartHome._astra_ui_contributions[0].icon_svg
-    assert 'data:image/png;base64,' in svg
     low = svg.lower()
     for forbidden in ('<script', 'onload=', 'onerror=', 'foreignobject'):
         assert forbidden not in low
     without_ns = low.replace('xmlns="http://www.w3.org/2000/svg"', '')
     assert 'http://' not in without_ns and 'https://' not in without_ns and 'file://' not in without_ns
-    payload = svg.split('base64,', 1)[1].split('"', 1)[0]
-    assert base64.b64decode(payload)[:8] == b'\x89PNG\r\n\x1a\n'
 
-def test_tab_icon_matches_main_icon():
-    # The tab icon is generated from icon.png: replacing the icon without
-    # regenerating src/tab_icon.py must fail here, not silently disagree.
-    PILImage = pytest.importorskip('PIL.Image')
-    import re
+def test_tab_icon_is_vector():
+    # Astra 0.2.7 leaves a tab blank when its icon is a PNG embedded via <image>.
     from src.tab_icon import TAB_ICON_SVG
-    icon = Path(__file__).resolve().parent.parent / 'icon.png'
-    side = int(re.search(r'viewBox="0 0 (\d+) (\d+)"', TAB_ICON_SVG).group(1))
-    expected = io.BytesIO()
-    PILImage.open(icon).convert('RGBA').resize((side, side), PILImage.Resampling.LANCZOS).save(expected, 'PNG', optimize=True)
-    embedded = base64.b64decode(TAB_ICON_SVG.split('base64,', 1)[1].split('"', 1)[0])
-    # PNG/zlib encoders can emit different bytes for the same pixels on each OS.
-    rendered = PILImage.open(io.BytesIO(embedded)).convert('RGBA')
-    wanted = PILImage.open(io.BytesIO(expected.getvalue())).convert('RGBA')
-    assert rendered.size == wanted.size
-    assert rendered.tobytes() == wanted.tobytes(), 'src/tab_icon.py is stale, regenerate it from icon.png'
+    assert TAB_ICON_SVG.startswith('<svg')
+    assert 'currentColor' in TAB_ICON_SVG
+    assert '<image' not in TAB_ICON_SVG and 'base64,' not in TAB_ICON_SVG
